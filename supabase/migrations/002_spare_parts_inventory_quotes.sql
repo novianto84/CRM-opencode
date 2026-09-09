@@ -133,6 +133,7 @@ $$;
 
 drop trigger if exists quotation_items_refresh_total on public.quotation_items;
 create trigger quotation_items_refresh_total
+after insert or update or delete on public.quotation_items
 for each row execute function public.refresh_quotation_total();
 
 create index inventory_movements_part_idx on public.inventory_movements(spare_part_id, created_at desc);
