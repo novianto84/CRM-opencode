@@ -14,7 +14,7 @@ Profil customer dan logo tersedia di `supabase/migrations/004_customer_profile.s
 4. Jalankan query.
 5. Pastikan tabel dan view `customer_summary` sudah muncul di **Table Editor**.
 6. Jalankan query `supabase/migrations/002_spare_parts_inventory_quotes.sql` untuk mengaktifkan stok, histori pergerakan, dan quotation.
-7. Jalankan query `supabase/migrations/003_contacts_relations.sql` untuk memisahkan data contact dari relasi customer.
+7. Jalankan query `supabase/migrations/003_contacts_relations.sql` untuk memisahkan data contact dari relasi customer. Migration ini wajib dijalankan sebelum menambah PIC baru.
 8. Jalankan query `supabase/migrations/004_customer_profile.sql` untuk mengaktifkan NPWP dan storage logo customer.
 
 ## Struktur Utama

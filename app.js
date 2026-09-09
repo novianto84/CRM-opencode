@@ -482,7 +482,11 @@ $('#relationForm').addEventListener('submit', async (event) => {
     const contact = await window.crmDb.createContact({ full_name: form.get('name'), position: form.get('position') || null, phone: form.get('phone') || null, email: form.get('email') || null, whatsapp: form.get('whatsapp') || null, identity_number: form.get('identityNumber') || null, birth_date: form.get('birthDate') || null, address: form.get('contactAddress') || null, notes: form.get('contactNotes') || null });
     result = contact.error ? contact : await window.crmDb.createCustomerContactRelation({ customer_id: relationCustomerId, contact_id: contact.data.id, full_name: form.get('name'), position: form.get('position') || null, phone: form.get('phone') || null, email: form.get('email') || null, role: form.get('role') || null });
   } else result = await window.crmDb.createCustomerLocation({ customer_id: relationCustomerId, name: form.get('name'), address: form.get('address'), contact_phone: form.get('phone') || null });
-  if (result.error) { window.alert(`Data belum tersimpan: ${result.error.message}`); return; }
+  if (result.error) {
+    const migrationMissing = result.error.message.includes('contacts') || result.error.message.includes('contact_id');
+    window.alert(migrationMissing ? 'Database contact belum siap. Jalankan migration 003_contacts_relations.sql di Supabase, lalu ulangi simpan PIC.' : `Data belum tersimpan: ${result.error.message}`);
+    return;
+  }
   event.target.reset();
   closeRelationModal();
   if (activeCustomerRow) await originalOpenCustomerDetail(activeCustomerRow);
