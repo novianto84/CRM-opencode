@@ -101,11 +101,22 @@ const renderDbContactRows = (relations) => {
     return `<tr data-contact-id="${key}"><td><div class="person"><div class="avatar avatar-blue">${initials}</div><div><b>${name}</b><small>${email || phone || '-'}</small></div></div></td><td><span class="status ${primary ? 'status-green' : 'status-blue'}">${primary ? 'PIC Utama' : 'PIC'}</span></td><td>${uniq(customers).join(', ') || '-'}</td><td>${phone || '-'}</td><td><b>${uniq(roles).join(', ') || '-'}</b></td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`;
   }).join('');
 };
-async function reloadContactDirectory() {
-  if (!window.crmDb?.ready) return;
+const renderPlainContactRows = (contacts) => contacts.map((contact) => {
+  const name = contact.full_name || '-';
+  const initials = name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
+  return `<tr data-contact-id="${contact.id}"><td><div class="person"><div class="avatar avatar-blue">${initials}</div><div><b>${name}</b><small>${contact.email || contact.phone || '-'}</small></div></div></td><td><span class="status status-blue">PIC</span></td><td>-</td><td>${contact.phone || '-'}</td><td><b>${contact.position || '-'}</b></td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`;
+}).join('');
+async function loadContactDirectory() {
+  if (!window.crmDb?.ready) return null;
   const dir = await window.crmDb.getContactDirectory();
-  if (dir.error) { showToast(`Daftar kontak gagal dimuat: ${dir.error.message}`, true); return; }
-  if (dir.data?.length) $('#contactRows').innerHTML = renderDbContactRows(dir.data);
+  if (!dir.error && dir.data?.length) { $('#contactRows').innerHTML = renderDbContactRows(dir.data); return null; }
+  const plain = await window.crmDb.getContacts();
+  if (!plain.error && plain.data?.length) { $('#contactRows').innerHTML = renderPlainContactRows(plain.data); return null; }
+  return dir.error || plain.error || null;
+}
+async function reloadContactDirectory() {
+  const err = await loadContactDirectory();
+  if (err) showToast(`Daftar kontak gagal dimuat: ${err.message}`, true);
 }
 const contactEditorModal = document.createElement('div');
 contactEditorModal.className = 'modal-backdrop';
@@ -845,7 +856,7 @@ const showDatabaseWarning = (errors) => {
   const warning = document.createElement('div');
   warning.id = 'databaseWarning';
   warning.className = 'database-warning';
-  warning.textContent = 'Sebagian data database belum dapat dimuat. Data yang tersimpan tidak dihapus.';
+  warning.innerHTML = `<b>Sebagian data belum dapat dimuat:</b> ${errors.join(' · ')}`;
   document.body.append(warning);
 };
 const renderQuotations = (quotations) => quotations.slice(0, 5).map((quote) => `<div><span class="quotation-code">${quote.quotation_code}</span><div><b>${quote.customers?.name || 'Customer'}</b><small>${quote.quotation_items?.map((item) => `${item.description} x ${item.quantity}`).join(' · ') || 'Belum ada item'}</small></div><strong>${formatRupiah(quote.total)}</strong><span class="status status-${quote.status === 'approved' ? 'green' : quote.status === 'sent' ? 'yellow' : 'gray'}">${quote.status}</span><button class="more-button print-quotation" data-quotation-id="${quote.id}" title="Cetak"><svg><use href="#i-more"/></svg></button></div>`).join('');
@@ -857,7 +868,7 @@ const printQuotation = (quote) => {
   printWindow.document.close(); printWindow.focus(); printWindow.print();
 };
 async function loadDatabaseData() {
-  const [customerResult, assetResult, scheduleResult, workOrderResult, partsResult, employeeResult, quotationResult, directoryResult] = await Promise.all([window.crmDb.getCustomers(), window.crmDb.getAssets(), window.crmDb.getMaintenanceSchedules(), window.crmDb.getWorkOrders(), window.crmDb.getSpareParts(), isAdmin() ? window.crmDb.getEmployees() : window.crmDb.getEmployeesPublic(), window.crmDb.getQuotations(), window.crmDb.getContactDirectory()]);
+  const [customerResult, assetResult, scheduleResult, workOrderResult, partsResult, employeeResult, quotationResult] = await Promise.all([window.crmDb.getCustomers(), window.crmDb.getAssets(), window.crmDb.getMaintenanceSchedules(), window.crmDb.getWorkOrders(), window.crmDb.getSpareParts(), isAdmin() ? window.crmDb.getEmployees() : window.crmDb.getEmployeesPublic(), window.crmDb.getQuotations()]);
   if (!customerResult.error && customerResult.data?.length) {
     $('#customerRows').innerHTML = renderDbCustomerRows(customerResult.data);
     $$('#customerRows .more-button').forEach((button) => button.addEventListener('click', () => openCustomerDetail(button.closest('tr'))));
@@ -888,10 +899,9 @@ async function loadDatabaseData() {
     quotationCache = quotationResult.data;
     $('#quotationList').innerHTML = renderQuotations(quotationCache);
   }
-  if (!directoryResult.error && directoryResult.data?.length) {
-    $('#contactRows').innerHTML = renderDbContactRows(directoryResult.data);
-  }
-  const databaseErrors = [customerResult, assetResult, scheduleResult, workOrderResult, partsResult, employeeResult, quotationResult, directoryResult].filter((result) => result.error);
+  const directoryError = await loadContactDirectory();
+  const databaseErrors = [['Customer', customerResult], ['Aset', assetResult], ['Maintenance', scheduleResult], ['SPK', workOrderResult], ['Spare part', partsResult], ['Karyawan', employeeResult], ['Quotation', quotationResult]].filter(([, result]) => result.error).map(([name, result]) => `${name}: ${result.error.message}`);
+  if (directoryError) databaseErrors.push(`Kontak: ${directoryError.message}`);
   showDatabaseWarning(databaseErrors);
   if (!customerResult.error && customerResult.data) {
     const activeCustomers = customerResult.data.filter((customer) => customer.status === 'active').length;
