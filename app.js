@@ -363,6 +363,10 @@ customerDetailModal.className = 'modal-backdrop';
 customerDetailModal.id = 'customerDetailModal';
 customerDetailModal.innerHTML = '<div class="modal customer-detail-modal"><div class="modal-header"><div><p class="eyebrow">CUSTOMER DETAIL</p><h2 id="customerDetailName">PT Sinar Abadi</h2><p class="detail-subtitle" id="customerDetailId"></p></div><button class="icon-button" id="closeCustomerDetail"><svg><use href="#i-close"/></svg></button></div><div class="customer-profile-strip"><div class="avatar avatar-blue" id="customerDetailAvatar">SA</div><div><span class="customer-type type-company" id="customerDetailType">Perusahaan</span><p id="customerDetailContact"></p></div><span class="status status-green">Customer aktif</span></div><div class="customer-detail-stats"><div><small>Aset terdaftar</small><b id="customerAssetTotal">12 unit</b></div><div><small>Maintenance aktif</small><b id="customerMaintenanceTotal">3 jadwal</b></div><div><small>Total histori</small><b>18 record</b></div><div><small>Customer sejak</small><b>Jan 2025</b></div></div><div class="customer-detail-grid"><section><div class="detail-section-heading"><h3>Aset customer</h3><button class="text-button">Lihat semua <svg><use href="#i-arrow"/></svg></button></div><div class="customer-asset-list"><div><span class="asset-thumb">G</span><div><b>Genset RG 250 kVA</b><small>RG250-2023-014 · Plant Karawang</small></div><span class="status status-yellow">Servis</span></div><div><span class="asset-thumb thumb-purple">G</span><div><b>Genset RG 125 kVA</b><small>RG125-2024-001 · Plant Bekasi</small></div><span class="status status-green">Aktif</span></div><div><span class="asset-thumb thumb-orange">G</span><div><b>Genset RG 80 kVA</b><small>RG080-2021-021 · Workshop</small></div><span class="status status-green">Aktif</span></div></div></section><section><div class="detail-section-heading"><h3>PIC utama</h3><button class="text-button">Kelola PIC <svg><use href="#i-arrow"/></svg></button></div><div class="detail-pic"><div class="avatar avatar-green">AW</div><div><b>Andi Wijaya</b><small>Operations Manager</small><small>0812 9988 7766</small></div></div><div class="customer-address"><small>Alamat customer</small><b>Jl. Industri Raya No. 20, Jakarta</b></div></section></div><div class="customer-history"><div class="detail-section-heading"><h3>Reminder & histori terbaru</h3><span class="last-update-badge">Update 09 Sep 2026, 10.42</span></div><div class="customer-history-list"><div><span class="history-date due-today">12 SEP</span><p><b>Servis berkala · Genset RG 250 kVA</b><small>Reminder perawatan 5.000 jam</small></p><span class="status status-yellow">Terjadwal</span></div><div><span class="history-date">18 AGU</span><p><b>Preventive maintenance selesai</b><small>Oli mesin dan filter solar diganti · SPK-2026-081</small></p><span class="status status-green">Selesai</span></div></div></div><div class="detail-actions"><button class="secondary-button" id="customerDetailEdit">Edit customer</button><button class="primary-button" id="closeCustomerDetailButton">Tutup</button></div></div>';
 document.body.append(customerDetailModal);
+const customerContactList = customerDetailModal.querySelector('.detail-pic');
+customerContactList.id = 'customerContactList';
+customerContactList.className = 'customer-contact-list';
+customerContactList.innerHTML = '<div class="detail-pic"><div class="avatar avatar-green">AW</div><div><b>Andi Wijaya</b><small>Operations Manager</small><small>0812 9988 7766</small></div><span class="status status-green">Utama</span></div>';
 const closeCustomerDetail = () => customerDetailModal.classList.remove('open');
 $('#closeCustomerDetail').addEventListener('click', closeCustomerDetail);
 $('#closeCustomerDetailButton').addEventListener('click', closeCustomerDetail);
@@ -382,12 +386,13 @@ const openCustomerDetail = async (row) => {
   $('#customerMaintenanceTotal').textContent = name === 'Lina Marlina' ? '1 jadwal' : '3 jadwal';
   if (window.crmDb?.ready && row.dataset.customerId) {
     const [contacts, locations] = await Promise.all([window.crmDb.getCustomerContacts(row.dataset.customerId), window.crmDb.getCustomerLocations(row.dataset.customerId)]);
-    const contact = contacts.data?.[0];
-    if (contact) {
-      $('.detail-pic b').textContent = contact.full_name;
-      $('.detail-pic small').textContent = contact.position || 'PIC Customer';
-      $('.detail-pic small:last-child').textContent = contact.phone || contact.email || '-';
-    }
+    if (contacts.data?.length) {
+      $('#customerContactList').innerHTML = contacts.data.map((contact) => {
+        const initials = contact.full_name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
+        const person = contact.contacts || contact;
+        return `<div class="detail-pic"><div class="avatar avatar-green">${initials}</div><div><b>${person.full_name}</b><small>${contact.role || person.position || 'PIC Customer'}</small><small>${person.phone || person.email || '-'}</small></div>${contact.is_primary ? '<span class="status status-green">Utama</span>' : ''}</div>`;
+      }).join('');
+    } else $('#customerContactList').innerHTML = '<div class="detail-pic"><div><b>Belum ada PIC</b><small>Tambahkan contact customer</small></div></div>';
     if (locations.data?.length) {
       $('#customerLocationSummary').innerHTML = `<small>Lokasi customer (${locations.data.length})</small><b>${locations.data[0].name} · ${locations.data[0].address}</b>`;
     }
@@ -419,7 +424,7 @@ customerDetailModal.querySelector('.customer-address').insertAdjacentHTML('befor
 
 const relationModal = document.createElement('div');
 relationModal.className = 'modal-backdrop';
-relationModal.innerHTML = '<div class="modal relation-modal"><div class="modal-header"><div><p class="eyebrow" id="relationEyebrow">CUSTOMER RELATION</p><h2 id="relationTitle">Tambah PIC</h2></div><button class="icon-button" id="closeRelationModal"><svg><use href="#i-close"/></svg></button></div><form id="relationForm"><label id="relationNameLabel">Nama PIC<input required name="name" placeholder="Nama lengkap" /></label><label id="relationPositionLabel">Jabatan<input name="position" placeholder="Jabatan atau keterangan" /></label><label id="relationRoleLabel">Peran PIC<input name="role" placeholder="Contoh: Procurement, Finance, Teknisi" /></label><label>No. telepon<input name="phone" placeholder="0812 0000 0000" /></label><label>Email<input type="email" name="email" placeholder="email@customer.com" /></label><label id="relationAddressLabel" hidden>Alamat lokasi<input name="address" placeholder="Alamat lengkap lokasi" /></label><div class="modal-actions"><button type="button" class="secondary-button" id="cancelRelationModal">Batal</button><button class="primary-button" type="submit">Simpan</button></div></form></div>';
+relationModal.innerHTML = '<div class="modal relation-modal"><div class="modal-header"><div><p class="eyebrow" id="relationEyebrow">CUSTOMER RELATION</p><h2 id="relationTitle">Tambah PIC</h2></div><button class="icon-button" id="closeRelationModal"><svg><use href="#i-close"/></svg></button></div><form id="relationForm"><label id="relationNameLabel">Nama PIC<input required name="name" placeholder="Nama lengkap" /></label><label id="relationPositionLabel">Jabatan<input name="position" placeholder="Jabatan atau keterangan" /></label><label id="relationRoleLabel">Peran PIC<input name="role" placeholder="Contoh: Procurement, Finance, Teknisi" /></label><label>No. telepon<input name="phone" placeholder="0812 0000 0000" /></label><label>Email<input type="email" name="email" placeholder="email@customer.com" /></label><label id="relationWhatsappLabel">WhatsApp<input name="whatsapp" placeholder="Nomor WhatsApp" /></label><label id="relationIdentityLabel">Nomor identitas<input name="identityNumber" placeholder="KTP / identitas lain" /></label><label id="relationBirthDateLabel">Tanggal lahir<input type="date" name="birthDate" /></label><label id="relationContactAddressLabel">Alamat contact<input name="contactAddress" placeholder="Alamat tinggal contact" /></label><label id="relationNotesLabel">Catatan<textarea name="contactNotes" rows="2" placeholder="Catatan tambahan"></textarea></label><label id="relationAddressLabel" hidden>Alamat lokasi<input name="address" placeholder="Alamat lengkap lokasi" /></label><div class="modal-actions"><button type="button" class="secondary-button" id="cancelRelationModal">Batal</button><button class="primary-button" type="submit">Simpan</button></div></form></div>';
 document.body.append(relationModal);
 let relationMode = 'pic';
 let relationCustomerId = null;
@@ -431,6 +436,7 @@ const openRelationModal = (mode) => {
   $('#relationEyebrow').textContent = mode === 'pic' ? 'CUSTOMER PIC' : 'CUSTOMER LOCATION';
   $('#relationPositionLabel').hidden = mode !== 'pic';
   $('#relationRoleLabel').hidden = mode !== 'pic';
+  ['relationWhatsappLabel', 'relationIdentityLabel', 'relationBirthDateLabel', 'relationContactAddressLabel', 'relationNotesLabel'].forEach((id) => { $(`#${id}`).hidden = mode !== 'pic'; });
   $('#relationAddressLabel').hidden = mode === 'pic';
   $('#relationNameLabel').firstChild.textContent = mode === 'pic' ? 'Nama PIC' : 'Nama lokasi';
   relationModal.classList.add('open');
@@ -450,7 +456,7 @@ $('#relationForm').addEventListener('submit', async (event) => {
   const form = new FormData(event.target);
   let result;
   if (relationMode === 'pic') {
-    const contact = await window.crmDb.createContact({ full_name: form.get('name'), position: form.get('position') || null, phone: form.get('phone') || null, email: form.get('email') || null });
+    const contact = await window.crmDb.createContact({ full_name: form.get('name'), position: form.get('position') || null, phone: form.get('phone') || null, email: form.get('email') || null, whatsapp: form.get('whatsapp') || null, identity_number: form.get('identityNumber') || null, birth_date: form.get('birthDate') || null, address: form.get('contactAddress') || null, notes: form.get('contactNotes') || null });
     result = contact.error ? contact : await window.crmDb.createCustomerContactRelation({ customer_id: relationCustomerId, contact_id: contact.data.id, full_name: form.get('name'), position: form.get('position') || null, phone: form.get('phone') || null, email: form.get('email') || null, role: form.get('role') || null });
   } else result = await window.crmDb.createCustomerLocation({ customer_id: relationCustomerId, name: form.get('name'), address: form.get('address'), contact_phone: form.get('phone') || null });
   if (result.error) { window.alert(`Data belum tersimpan: ${result.error.message}`); return; }

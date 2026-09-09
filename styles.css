@@ -47,3 +47,4 @@
 @media(max-width:560px){.stock-form-grid{grid-template-columns:1fr}.inventory-intro-actions{flex-wrap:wrap}}
 :root{--database-warning:#fff3cd}
 .database-warning{position:fixed;z-index:1000;top:14px;left:50%;transform:translateX(-50%);padding:10px 16px;border:1px solid #f0d486;border-radius:8px;background:var(--database-warning);color:#765b16;font-size:12px;box-shadow:0 8px 22px rgba(28,36,52,.12)}
+ .customer-contact-list{display:grid;gap:8px}.detail-pic>div:nth-child(2){flex:1}
