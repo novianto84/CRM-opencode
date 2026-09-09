@@ -57,11 +57,25 @@
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('customer_contacts').update(payload).eq('id', id).select().single();
     },
+    async getEmployee(id) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('employees').select('*').eq('id', id).single();
+    },
+    async updateEmployee(id, payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('employees').update(payload).eq('id', id).select().single();
+    },
     async getMyEmployee() {
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       const { data: userData, error: userError } = await window.supabaseClient.auth.getUser();
       if (userError || !userData?.user) return { data: null, error: userError || new Error('Belum login') };
-      return window.supabaseClient.from('employees').select('id, full_name, access_level, is_active').eq('auth_user_id', userData.user.id).eq('is_active', true).maybeSingle();
+      const byId = await window.supabaseClient.from('employees').select('id, full_name, access_level, is_active').eq('auth_user_id', userData.user.id).eq('is_active', true).maybeSingle();
+      if (byId.data || byId.error) return byId;
+      const byEmail = await window.supabaseClient.from('employees').select('id, full_name, access_level, is_active').eq('email', userData.user.email).eq('is_active', true).maybeSingle();
+      if (!byEmail.error && byEmail.data) {
+        await window.supabaseClient.from('employees').update({ auth_user_id: userData.user.id }).eq('id', byEmail.data.id);
+      }
+      return byEmail;
     },
     async getCustomerLocations(customerId) {
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
