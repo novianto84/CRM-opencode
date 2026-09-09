@@ -461,7 +461,7 @@ const renderDbMaintenanceRows = (schedules) => schedules.map((schedule) => {
   const type = schedule.maintenance_type.charAt(0).toUpperCase() + schedule.maintenance_type.slice(1);
   return `<tr data-maintenance-status="planned"><td><div class="schedule-name"><span class="schedule-icon schedule-blue">◷</span><div><b>${schedule.title}</b><small>${schedule.id.slice(0, 8).toUpperCase()}</small></div></div></td><td>${schedule.assets?.name || '-'}<br><small>${schedule.assets?.generator_serial || schedule.assets?.asset_code || '-'}</small></td><td>${schedule.assets?.customers?.name || '-'}</td><td>${type}</td><td>${dueDate}</td><td>Belum ditugaskan</td><td><span class="status status-blue">Terjadwal</span></td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`;
 }).join('');
-const renderDbWorkOrderRows = (orders) => orders.map((order) => `<tr data-workorder-status="${order.status}"><td><span class="workorder-code">${order.work_order_code}</span></td><td><b>${order.customers?.name || '-'}</b><small>${order.assets?.name || 'Belum ada aset'}</small></td><td>${order.title}</td><td>Belum ditugaskan</td><td>${order.scheduled_at ? new Date(order.scheduled_at).toLocaleDateString('id-ID') : 'Belum dijadwalkan'}</td><td><span class="status status-blue">${order.status.replaceAll('_', ' ')}</span></td><td>${new Date(order.updated_at).toLocaleDateString('id-ID')}</td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`).join('');
+const renderDbWorkOrderRows = (orders) => orders.map((order) => `<tr data-workorder-status="${order.status}" data-workorder-id="${order.id}" data-asset-db-id="${order.assets?.id || ''}"><td><span class="workorder-code">${order.work_order_code}</span></td><td><b>${order.customers?.name || '-'}</b><small>${order.assets?.name || 'Belum ada aset'}</small></td><td>${order.title}</td><td>Belum ditugaskan</td><td>${order.scheduled_at ? new Date(order.scheduled_at).toLocaleDateString('id-ID') : 'Belum dijadwalkan'}</td><td><span class="status status-blue">${order.status.replaceAll('_', ' ')}</span></td><td>${new Date(order.updated_at).toLocaleDateString('id-ID')}</td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`).join('');
 async function loadDatabaseData() {
   const [customerResult, assetResult, scheduleResult, workOrderResult] = await Promise.all([window.crmDb.getCustomers(), window.crmDb.getAssets(), window.crmDb.getMaintenanceSchedules(), window.crmDb.getWorkOrders()]);
   if (!customerResult.error && customerResult.data?.length) {
@@ -479,6 +479,7 @@ async function loadDatabaseData() {
   if (!workOrderResult.error && workOrderResult.data?.length) {
     $('#workOrderRows').innerHTML = renderDbWorkOrderRows(workOrderResult.data);
     $('#workOrderCount').textContent = `${workOrderResult.data.length} dari ${workOrderResult.data.length}`;
+    $$('#workOrderRows .more-button').forEach((button) => button.addEventListener('click', () => openWorkOrderReport(button.closest('tr'))));
   }
 }
 setupAuth();
@@ -561,7 +562,46 @@ $('#workOrderForm').addEventListener('submit', async (event) => {
   row.dataset.workorderStatus = 'open';
   row.innerHTML = `<td><span class="workorder-code">SPK-NEW-${Date.now().toString().slice(-4)}</span></td><td><b>${customerName}</b><small>${assetName}</small></td><td>${form.get('title')}</td><td>Belum ditugaskan</td><td>${new Date(form.get('scheduledAt')).toLocaleDateString('id-ID')}</td><td><span class="status status-blue">Open</span></td><td>Baru saja</td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td>`;
   $('#workOrderRows').prepend(row);
+  row.dataset.workorderId = `demo-${Date.now()}`;
+  row.querySelector('.more-button').addEventListener('click', () => openWorkOrderReport(row));
   $('#workOrderCount').textContent = `${$('#workOrderRows tr').length} dari 14`;
   event.target.reset();
   closeWorkOrderModal();
+});
+
+const reportModal = document.createElement('div');
+reportModal.className = 'modal-backdrop';
+reportModal.innerHTML = '<div class="modal report-modal"><div class="modal-header"><div><p class="eyebrow">TECHNICIAN REPORT</p><h2 id="reportTitle">Laporan pekerjaan</h2><p class="detail-subtitle" id="reportSubtitle"></p></div><button class="icon-button" id="closeReportModal"><svg><use href="#i-close"/></svg></button></div><form id="reportForm"><p class="report-label">Checklist pekerjaan</p><div class="checklist-grid"><label><input type="checkbox" name="checklist" value="visual" /> Pemeriksaan visual</label><label><input type="checkbox" name="checklist" value="oil" /> Oli mesin</label><label><input type="checkbox" name="checklist" value="filter" /> Filter dan fuel system</label><label><input type="checkbox" name="checklist" value="cooling" /> Sistem pendingin</label><label><input type="checkbox" name="checklist" value="battery" /> Battery dan panel</label><label><input type="checkbox" name="checklist" value="testing" /> Uji beban / testing</label></div><label>Ringkasan pekerjaan<textarea required name="summary" rows="3" placeholder="Jelaskan pekerjaan yang dilakukan"></textarea></label><label>Temuan teknisi<textarea name="findings" rows="2" placeholder="Temuan atau rekomendasi"></textarea></label><div class="report-form-grid"><label>Jam operasi saat servis<input required type="number" name="operatingHours" min="0" placeholder="Contoh: 5000" /></label><label>Status laporan<select name="status"><option value="completed">Selesai</option><option value="in_progress">Masih dikerjakan</option></select></label></div><label class="approval-check"><input type="checkbox" name="customerApproved" /> Customer menyetujui hasil pekerjaan</label><div class="modal-actions"><button type="button" class="secondary-button" id="cancelReportModal">Batal</button><button class="primary-button" type="submit">Simpan laporan</button></div></form></div>';
+document.body.append(reportModal);
+const closeReportModal = () => reportModal.classList.remove('open');
+let activeWorkOrderRow = null;
+const openWorkOrderReport = (row) => {
+  activeWorkOrderRow = row;
+  $('#reportTitle').textContent = `Laporan ${row.querySelector('.workorder-code')?.textContent || 'SPK'}`;
+  $('#reportSubtitle').textContent = row.cells[1]?.textContent.replace('\n', ' · ') || '';
+  reportModal.classList.add('open');
+};
+$('#closeReportModal').addEventListener('click', closeReportModal);
+$('#cancelReportModal').addEventListener('click', closeReportModal);
+reportModal.addEventListener('click', (event) => { if (event.target === reportModal) closeReportModal(); });
+$$('#workOrderRows tr').forEach((row, index) => { row.dataset.workorderId = row.dataset.workorderId || `demo-${index + 1}`; row.querySelector('.more-button').addEventListener('click', () => openWorkOrderReport(row)); });
+$('#reportForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = new FormData(event.target);
+  const workOrderId = activeWorkOrderRow?.dataset.workorderId;
+  const assetId = activeWorkOrderRow?.dataset.assetDbId;
+  const checklist = form.getAll('checklist');
+  if (window.crmDb?.ready && (workOrderId?.startsWith('demo-') || !assetId)) { window.alert('SPK demo belum memiliki relasi database. Buat SPK dari customer dan aset yang tersimpan di database.'); return; }
+  if (window.crmDb?.ready) {
+    const report = await window.crmDb.createMaintenanceRecord({ work_order_id: workOrderId, asset_id: assetId, maintenance_type: 'preventive', status: form.get('status'), performed_at: new Date().toISOString(), operating_hours: Number(form.get('operatingHours')), findings: form.get('findings') || null, work_summary: `${form.get('summary')}\nChecklist: ${checklist.join(', ') || 'Tidak ada'}` });
+    if (report.error) { window.alert(`Laporan belum tersimpan: ${report.error.message}`); return; }
+    const updated = await window.crmDb.updateWorkOrder(workOrderId, { status: form.get('status') === 'completed' ? 'completed' : 'in_progress', completed_at: form.get('status') === 'completed' ? new Date().toISOString() : null, customer_approved_at: form.get('customerApproved') ? new Date().toISOString() : null });
+    if (updated.error) { window.alert(`Laporan tersimpan, tetapi status SPK belum diperbarui: ${updated.error.message}`); return; }
+  }
+  activeWorkOrderRow.dataset.workorderStatus = form.get('status');
+  activeWorkOrderRow.querySelector('.status').textContent = form.get('status') === 'completed' ? 'Completed' : 'In progress';
+  activeWorkOrderRow.querySelector('.status').className = `status ${form.get('status') === 'completed' ? 'status-green' : 'status-purple'}`;
+  activeWorkOrderRow.cells[6].textContent = 'Baru saja';
+  event.target.reset();
+  closeReportModal();
 });

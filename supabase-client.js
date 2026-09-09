@@ -55,11 +55,19 @@
     },
     async getWorkOrders() {
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
-      return window.supabaseClient.from('work_orders').select('*, customers(name), assets(name, asset_code)').order('updated_at', { ascending: false });
+      return window.supabaseClient.from('work_orders').select('*, customers(name), assets(id, name, asset_code)').order('updated_at', { ascending: false });
     },
     async createWorkOrder(payload) {
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('work_orders').insert(payload).select().single();
+    },
+    async updateWorkOrder(id, payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('work_orders').update(payload).eq('id', id).select().single();
+    },
+    async createMaintenanceRecord(payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('maintenance_records').insert(payload).select().single();
     }
   };
 
