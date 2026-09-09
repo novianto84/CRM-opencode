@@ -41,6 +41,28 @@ alter table public.maintenance_parts
   add column if not exists warehouse_id uuid references public.warehouses(id) on delete restrict,
   add column if not exists inventory_movement_id uuid references public.inventory_movements(id) on delete set null;
 
+create or replace function public.record_maintenance_part_usage()
+returns trigger
+language plpgsql
+as $$
+declare
+  movement_id uuid;
+begin
+  if new.warehouse_id is null or new.inventory_movement_id is not null then
+    return new;
+  end if;
+  insert into public.inventory_movements (spare_part_id, warehouse_id, movement_type, quantity, unit_cost, reference_type, reference_id)
+  select new.spare_part_id, new.warehouse_id, 'outbound', new.quantity, new.unit_cost, 'maintenance', new.maintenance_record_id
+  returning id into movement_id;
+  update public.maintenance_parts set inventory_movement_id = movement_id where id = new.id;
+  return new;
+end;
+$$;
+
+drop trigger if exists maintenance_parts_record_usage on public.maintenance_parts;
+create trigger maintenance_parts_record_usage
+for each row execute function public.record_maintenance_part_usage();
+
 create or replace view public.spare_part_inventory as
 select
   sp.id as spare_part_id,
