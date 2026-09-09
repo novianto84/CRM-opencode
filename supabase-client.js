@@ -53,6 +53,16 @@
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('customer_contacts').insert(payload).select().single();
     },
+    async updateCustomerContact(id, payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('customer_contacts').update(payload).eq('id', id).select().single();
+    },
+    async getMyEmployee() {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      const { data: userData, error: userError } = await window.supabaseClient.auth.getUser();
+      if (userError || !userData?.user) return { data: null, error: userError || new Error('Belum login') };
+      return window.supabaseClient.from('employees').select('id, full_name, access_level, is_active').eq('auth_user_id', userData.user.id).eq('is_active', true).maybeSingle();
+    },
     async getCustomerLocations(customerId) {
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('customer_locations').select('*').eq('customer_id', customerId).eq('is_active', true).order('is_primary', { ascending: false });

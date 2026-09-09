@@ -412,7 +412,7 @@ const openCustomerDetail = async (row) => {
       $('#customerContactList').innerHTML = contacts.data.map((contact) => {
         const initials = contact.full_name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
         const person = contact.contacts || contact;
-        return `<div class="detail-pic"><div class="avatar avatar-green">${initials}</div><div><b>${person.full_name}</b><small>${contact.role || person.position || 'PIC Customer'}</small><small>${person.phone || person.email || '-'}</small></div>${contact.is_primary ? '<span class="status status-green">Utama</span>' : ''}</div>`;
+        return `<div class="detail-pic"><div class="avatar avatar-green">${initials}</div><div><b>${person.full_name}</b><small>${contact.role || person.position || 'PIC Customer'}</small><small>${person.phone || person.email || '-'}</small></div>${contact.is_primary ? '<span class="status status-green">Utama</span>' : ''}${isAdmin() ? `<button class="icon-button delete-pic" data-relation-id="${contact.id}" data-pic-name="${person.full_name}" title="Hapus PIC">✕</button>` : ''}</div>`;
       }).join('');
     } else $('#customerContactList').innerHTML = '<div class="detail-pic"><div><b>Belum ada PIC</b><small>Tambahkan contact customer</small></div></div>';
     if (locations.data?.length) {
@@ -421,6 +421,17 @@ const openCustomerDetail = async (row) => {
   }
   customerDetailModal.classList.add('open');
 };
+$('#customerContactList').addEventListener('click', async (event) => {
+  const button = event.target.closest('.delete-pic');
+  if (!button) return;
+  if (!isAdmin()) { showToast('Hanya administrator yang dapat menghapus PIC.', true); return; }
+  if (!window.confirm(`Hapus ${button.dataset.picName} dari customer ini? Data contact-nya tetap tersimpan dan bisa dihubungkan kembali.`)) return;
+  button.disabled = true;
+  const result = await window.crmDb.updateCustomerContact(button.dataset.relationId, { is_active: false });
+  if (result.error) { showToast(`PIC gagal dihapus: ${result.error.message}`, true); button.disabled = false; return; }
+  showToast('PIC berhasil dihapus dari customer.');
+  if (activeCustomerRow) await originalOpenCustomerDetail(activeCustomerRow);
+});
 $$('#customerRows tr').forEach((row, index) => { row.dataset.customerId = row.dataset.customerId || `demo-${index + 1}`; });
 $$('#customerRows .more-button').forEach((button) => button.addEventListener('click', () => openCustomerDetail(button.closest('tr'))));
 $('#customerDetailEdit').addEventListener('click', async () => {
@@ -534,9 +545,9 @@ const showAuthGate = () => authGate.classList.remove('hidden');
 const setupAuth = async () => {
   if (!window.crmDb?.ready) { hideAuthGate(); return; }
   const { data } = await window.supabaseClient.auth.getSession();
-  if (data.session) { hideAuthGate(); await loadDatabaseData(); return; }
+  if (data.session) { hideAuthGate(); await loadAccessLevel(); await loadDatabaseData(); return; }
   showAuthGate();
-  window.supabaseClient.auth.onAuthStateChange(async (_event, session) => { if (session) { hideAuthGate(); await loadDatabaseData(); } else showAuthGate(); });
+  window.supabaseClient.auth.onAuthStateChange(async (_event, session) => { if (session) { hideAuthGate(); await loadAccessLevel(); await loadDatabaseData(); } else showAuthGate(); });
 };
 $('#authForm').addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -591,6 +602,14 @@ const renderDbEmployeeRows = (employees) => employees.map((employee) => {
   return `<tr data-department="${department}" data-employee-id="${employee.id}"><td><div class="person"><div class="avatar avatar-blue">${initials}</div><div><b>${employee.full_name}</b><small>${employee.email}</small></div></div></td><td>${employee.position}</td><td>${employee.department}</td><td><span class="access ${accessClass}">${employee.access_level}</span></td><td><span class="status ${employee.is_active ? 'status-green' : 'status-gray'}">${employee.is_active ? 'Aktif' : 'Tidak aktif'}</span></td><td>${employee.last_login_at ? new Date(employee.last_login_at).toLocaleString('id-ID') : 'Belum pernah login'}</td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`;
 }).join('');
 let quotationCache = [];
+let currentAccessLevel = 'viewer';
+const isAdmin = () => currentAccessLevel === 'administrator';
+const loadAccessLevel = async () => {
+  currentAccessLevel = 'viewer';
+  if (!window.crmDb?.ready) return;
+  const result = await window.crmDb.getMyEmployee();
+  if (!result.error && result.data?.access_level) currentAccessLevel = result.data.access_level;
+};
 const formatRupiah = (value) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
 const showDatabaseWarning = (errors) => {
   if (!errors.length || $('#databaseWarning')) return;
