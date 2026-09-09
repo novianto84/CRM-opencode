@@ -11,13 +11,13 @@ select
   c.customer_type,
   c.name,
   c.status,
-  c.npwp,
-  c.logo_url,
   count(distinct a.id)::integer as asset_count,
   count(distinct cc.id)::integer as contact_count,
   min(ms.next_due_date) filter (where ms.is_active and a.status = 'active') as next_maintenance_date,
   c.created_at,
-  c.updated_at
+  c.updated_at,
+  c.npwp,
+  c.logo_url
 from public.customers c
 left join public.assets a on a.customer_id = c.id
 left join public.customer_contacts cc on cc.customer_id = c.id and cc.is_active
