@@ -267,9 +267,13 @@ $('#employeeSearch').addEventListener('input', (event) => {
   $('#employeeCount').textContent = `${visible} dari 18`;
 });
 $('#employeeRoleFilter').addEventListener('change', () => $('#employeeSearch').dispatchEvent(new Event('input')));
-$('#employeeForm').addEventListener('submit', (event) => {
+$('#employeeForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = new FormData(event.target);
+  if (window.crmDb?.ready) {
+    const result = await window.crmDb.createEmployee({ full_name: form.get('name'), email: form.get('email'), position: form.get('position'), department: form.get('department') === 'service' ? 'Service & Teknisi' : form.get('department') === 'sales' ? 'Sales' : 'Administrasi', access_level: form.get('access').toLowerCase() });
+    if (result.error) { window.alert(`Karyawan belum tersimpan: ${result.error.message}`); return; }
+  }
   const name = form.get('name');
   const initials = name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
   const accessClass = { Administrator: 'access-admin', Editor: 'access-editor', Operator: 'access-operator', Viewer: 'access-viewer' }[form.get('access')];
@@ -465,8 +469,14 @@ const renderDbMaintenanceRows = (schedules) => schedules.map((schedule) => {
 }).join('');
 const renderDbWorkOrderRows = (orders) => orders.map((order) => `<tr data-workorder-status="${order.status}" data-workorder-id="${order.id}" data-asset-db-id="${order.assets?.id || ''}"><td><span class="workorder-code">${order.work_order_code}</span></td><td><b>${order.customers?.name || '-'}</b><small>${order.assets?.name || 'Belum ada aset'}</small></td><td>${order.title}</td><td>Belum ditugaskan</td><td>${order.scheduled_at ? new Date(order.scheduled_at).toLocaleDateString('id-ID') : 'Belum dijadwalkan'}</td><td><span class="status status-blue">${order.status.replaceAll('_', ' ')}</span></td><td>${new Date(order.updated_at).toLocaleDateString('id-ID')}</td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`).join('');
 const renderDbPartRows = (parts) => parts.map((part) => `<tr data-spare-part-id="${part.spare_part_id}" data-stock="${part.stock_on_hand <= part.minimum_stock ? 'low' : 'safe'}"><td><span class="part-code">${part.part_code}</span></td><td><b>${part.name}</b><small>${part.unit}</small></td><td>Spare part</td><td>Terdaftar di database</td><td><strong class="${part.stock_on_hand <= part.minimum_stock ? 'warning-text' : ''}">${part.stock_on_hand} ${part.unit}</strong></td><td>${part.minimum_stock} ${part.unit}</td><td>Belum diatur</td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`).join('');
+const renderDbEmployeeRows = (employees) => employees.map((employee) => {
+  const initials = employee.full_name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
+  const department = employee.department.toLowerCase().includes('service') ? 'service' : employee.department.toLowerCase().includes('sales') ? 'sales' : 'admin';
+  const accessClass = { administrator: 'access-admin', editor: 'access-editor', operator: 'access-operator', viewer: 'access-viewer' }[employee.access_level] || 'access-viewer';
+  return `<tr data-department="${department}" data-employee-id="${employee.id}"><td><div class="person"><div class="avatar avatar-blue">${initials}</div><div><b>${employee.full_name}</b><small>${employee.email}</small></div></div></td><td>${employee.position}</td><td>${employee.department}</td><td><span class="access ${accessClass}">${employee.access_level}</span></td><td><span class="status ${employee.is_active ? 'status-green' : 'status-gray'}">${employee.is_active ? 'Aktif' : 'Tidak aktif'}</span></td><td>${employee.last_login_at ? new Date(employee.last_login_at).toLocaleString('id-ID') : 'Belum pernah login'}</td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`;
+}).join('');
 async function loadDatabaseData() {
-  const [customerResult, assetResult, scheduleResult, workOrderResult, partsResult] = await Promise.all([window.crmDb.getCustomers(), window.crmDb.getAssets(), window.crmDb.getMaintenanceSchedules(), window.crmDb.getWorkOrders(), window.crmDb.getSpareParts()]);
+  const [customerResult, assetResult, scheduleResult, workOrderResult, partsResult, employeeResult] = await Promise.all([window.crmDb.getCustomers(), window.crmDb.getAssets(), window.crmDb.getMaintenanceSchedules(), window.crmDb.getWorkOrders(), window.crmDb.getSpareParts(), window.crmDb.getEmployees()]);
   if (!customerResult.error && customerResult.data?.length) {
     $('#customerRows').innerHTML = renderDbCustomerRows(customerResult.data);
     $$('#customerRows .more-button').forEach((button) => button.addEventListener('click', () => openCustomerDetail(button.closest('tr'))));
@@ -487,6 +497,10 @@ async function loadDatabaseData() {
   if (!partsResult.error && partsResult.data?.length) {
     $('#partRows').innerHTML = renderDbPartRows(partsResult.data);
     $('#partCount').textContent = `${partsResult.data.length} dari ${partsResult.data.length}`;
+  }
+  if (!employeeResult.error && employeeResult.data?.length) {
+    $('#employeeRows').innerHTML = renderDbEmployeeRows(employeeResult.data);
+    $('#employeeCount').textContent = `${employeeResult.data.length} dari ${employeeResult.data.length}`;
   }
 }
 setupAuth();
@@ -534,10 +548,14 @@ const workOrderModal = document.createElement('div');
 workOrderModal.className = 'modal-backdrop';
 workOrderModal.innerHTML = '<div class="modal workorder-modal"><div class="modal-header"><div><p class="eyebrow">SERVICE ORDER</p><h2>Buat SPK baru</h2></div><button class="icon-button" id="closeWorkOrderModal"><svg><use href="#i-close"/></svg></button></div><form id="workOrderForm"><label>Customer<select required name="customer" id="workOrderCustomerSelect"></select></label><label>Aset genset<select name="asset" id="workOrderAssetSelect"></select></label><label>Judul pekerjaan<input required name="title" placeholder="Contoh: Servis berkala genset" /></label><label>Deskripsi pekerjaan<textarea name="description" rows="3" placeholder="Keluhan, scope pekerjaan, atau catatan teknisi"></textarea></label><div class="workorder-form-grid"><label>Jadwal pekerjaan<input required type="datetime-local" name="scheduledAt" /></label><label>Prioritas<select name="priority"><option>Normal</option><option>Urgent</option><option>Critical</option></select></label></div><div class="modal-actions"><button type="button" class="secondary-button" id="cancelWorkOrderModal">Batal</button><button class="primary-button" type="submit">Simpan SPK</button></div></form></div>';
 document.body.append(workOrderModal);
+const technicianField = document.createElement('label');
+technicianField.innerHTML = 'Teknisi penanggung jawab<select name="technician" id="workOrderTechnicianSelect"><option value="">Belum ditugaskan</option></select>';
+$('#workOrderForm label:first-child').after(technicianField);
 const closeWorkOrderModal = () => workOrderModal.classList.remove('open');
 const refreshWorkOrderOptions = () => {
   $('#workOrderCustomerSelect').innerHTML = $$('#customerRows tr').map((row) => `<option value="${row.dataset.customerId}">${row.querySelector('.person b')?.textContent || 'Customer'}</option>`).join('');
   $('#workOrderAssetSelect').innerHTML = '<option value="">Tanpa aset spesifik</option>' + $$('#assetRows tr').map((row) => `<option value="${row.dataset.assetDbId || ''}" data-code="${row.dataset.assetId}">${row.querySelector('.asset-name b')?.textContent || 'Aset'}</option>`).join('');
+  $('#workOrderTechnicianSelect').innerHTML = '<option value="">Belum ditugaskan</option>' + $$('#employeeRows tr').map((row) => `<option value="${row.dataset.employeeId || ''}">${row.querySelector('.person b')?.textContent || 'Teknisi'}</option>`).filter((option) => !option.includes('value=""')).join('');
 };
 $('#addWorkOrderButton').addEventListener('click', () => { refreshWorkOrderOptions(); workOrderModal.classList.add('open'); });
 $('#closeWorkOrderModal').addEventListener('click', closeWorkOrderModal);
@@ -560,7 +578,7 @@ $('#workOrderForm').addEventListener('submit', async (event) => {
   if (window.crmDb?.ready && (!customerId || customerId.startsWith('demo-'))) { window.alert('Customer belum memiliki ID database. Simpan customer terlebih dahulu.'); return; }
   if (window.crmDb?.ready && assetId && !assetId.match(/^[0-9a-f-]{36}$/i)) { window.alert('Aset yang dipilih belum memiliki ID database.'); return; }
   if (window.crmDb?.ready) {
-    const result = await window.crmDb.createWorkOrder({ customer_id: customerId, asset_id: assetId || null, title: form.get('title'), description: form.get('description') || null, status: 'open', scheduled_at: form.get('scheduledAt') ? new Date(form.get('scheduledAt')).toISOString() : null });
+    const result = await window.crmDb.createWorkOrder({ customer_id: customerId, asset_id: assetId || null, assigned_to: form.get('technician') || null, title: form.get('title'), description: form.get('description') || null, status: 'open', scheduled_at: form.get('scheduledAt') ? new Date(form.get('scheduledAt')).toISOString() : null });
     if (result.error) { window.alert(`SPK belum tersimpan: ${result.error.message}`); return; }
   }
   const customerName = $('#workOrderCustomerSelect').options[$('#workOrderCustomerSelect').selectedIndex]?.textContent || 'Customer';

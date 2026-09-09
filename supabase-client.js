@@ -96,6 +96,14 @@
     async createQuotationItem(payload) {
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('quotation_items').insert(payload).select().single();
+    },
+    async getEmployees() {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('employees').select('*').order('full_name');
+    },
+    async createEmployee(payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('employees').insert(payload).select().single();
     }
   };
 
