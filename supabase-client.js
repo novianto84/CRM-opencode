@@ -65,6 +65,18 @@
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('employees').update(payload).eq('id', id).select().single();
     },
+    async getEmployeesPublic() {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('employee_public').select('*').order('full_name');
+    },
+    async uploadEmployeePhoto(employeeId, file) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      const path = `${employeeId}/${Date.now()}-${file.name.replace(/[^a-z0-9.\-_]/gi, '-')}`;
+      const upload = await window.supabaseClient.storage.from('employee-photos').upload(path, file, { upsert: true, contentType: file.type });
+      if (upload.error) return { data: null, error: upload.error };
+      const { data } = window.supabaseClient.storage.from('employee-photos').getPublicUrl(path);
+      return { data: { publicUrl: data.publicUrl }, error: null };
+    },
     async getMyEmployee() {
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       const { data: userData, error: userError } = await window.supabaseClient.auth.getUser();

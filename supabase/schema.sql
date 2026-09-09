@@ -46,6 +46,12 @@ create table public.employees (
   full_name text not null,
   email text not null unique,
   phone text,
+  phone2 text,
+  email2 text,
+  npwp text,
+  bank_name text,
+  bank_account_number text,
+  photo_url text,
   position text not null,
   department text not null,
   access_level text not null default 'operator' check (access_level in ('administrator', 'editor', 'operator', 'viewer')),
@@ -248,6 +254,21 @@ create table public.audit_logs (
   new_data jsonb,
   created_at timestamptz not null default now()
 );
+
+create or replace view public.employee_public as
+select
+  id,
+  employee_code,
+  full_name,
+  email,
+  position,
+  department,
+  access_level,
+  is_active,
+  last_login_at,
+  created_at,
+  updated_at
+from public.employees;
 
 create index customers_status_idx on public.customers(status);
 create index customer_locations_customer_idx on public.customer_locations(customer_id);

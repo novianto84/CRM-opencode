@@ -255,11 +255,19 @@ $('#assetForm').addEventListener('submit', async (event) => {
 const employeeModal = document.createElement('div');
 employeeModal.className = 'modal-backdrop';
 employeeModal.id = 'employeeModal';
-employeeModal.innerHTML = '<div class="modal employee-modal"><div class="modal-header"><div><p class="eyebrow">MASTER DATA INTERNAL</p><h2>Tambah karyawan</h2></div><button class="icon-button" id="closeEmployeeModal"><svg><use href="#i-close"/></svg></button></div><p class="modal-description">User ini dapat ditetapkan sebagai pelaksana SPK dan tercatat pada setiap perubahan record. Email yang sama dengan akun login akan otomatis tertaut; level Administrator membuka tombol hapus PIC.</p><form id="employeeForm"><div class="employee-form-grid"><label>Nama lengkap<input required name="name" placeholder="Contoh: Andi Wijaya" /></label><label>Email kerja<input required type="email" name="email" placeholder="andi@ruangmotors.id" /></label><label>Jabatan<input required name="position" placeholder="Contoh: Teknisi Senior" /></label><label>Departemen<select required name="department"><option value="service">Service & Teknisi</option><option value="sales">Sales</option><option value="admin">Administrasi</option></select></label><label>Level akses<select required name="access"><option value="Operator">Operator</option><option value="Editor">Editor</option><option value="Viewer">Viewer</option><option value="Administrator">Administrator</option></select></label><label>No. telepon<input name="phone" placeholder="Contoh: 0812 0000 0000" /></label><label>Auth User ID (opsional)<input name="authUserId" placeholder="UUID dari Supabase Auth" /></label><label class="approval-check"><input type="checkbox" name="isActive" checked /> Akun aktif</label></div><div class="modal-actions"><button type="button" class="secondary-button" id="copyMyUidButton">Salin UID saya</button><button type="button" class="secondary-button" id="cancelEmployeeModal">Batal</button><button class="primary-button" type="submit">Simpan karyawan</button></div></form></div>';
+employeeModal.innerHTML = '<div class="modal employee-modal"><div class="modal-header"><div><p class="eyebrow">MASTER DATA INTERNAL</p><h2>Tambah karyawan</h2></div><button class="icon-button" id="closeEmployeeModal"><svg><use href="#i-close"/></svg></button></div><p class="modal-description">User ini dapat ditetapkan sebagai pelaksana SPK dan tercatat pada setiap perubahan record. Email yang sama dengan akun login akan otomatis tertaut; level Administrator membuka tombol hapus PIC. Data kontak sensitif hanya terlihat oleh admin dan editor; NPWP dan bank hanya admin.</p><form id="employeeForm"><div class="employee-form-grid"><label>Nama lengkap<input required name="name" placeholder="Contoh: Andi Wijaya" /></label><label>Email kerja 1<input required type="email" name="email" placeholder="andi@ruangmotors.id" /></label><label id="empEmail2Label">Email kerja 2<input type="email" name="email2" placeholder="Email kedua (opsional)" /></label><label>Jabatan<input required name="position" placeholder="Contoh: Teknisi Senior" /></label><label>Departemen<select required name="department"><option value="service">Service & Teknisi</option><option value="sales">Sales</option><option value="admin">Administrasi</option></select></label><label>Level akses<select required name="access"><option value="Operator">Operator</option><option value="Editor">Editor</option><option value="Viewer">Viewer</option><option value="Administrator">Administrator</option></select></label><label id="empPhoneLabel">Handphone 1<input name="phone" placeholder="Contoh: 0812 0000 0000" /></label><label id="empPhone2Label">Handphone 2<input name="phone2" placeholder="Nomor kedua (opsional)" /></label><label id="empNpwpLabel">NPWP<input name="npwp" placeholder="Nomor NPWP" /></label><label id="empBankLabel">Bank<input name="bankName" placeholder="Nama bank" /></label><label id="empBankAccountLabel">Nomor rekening<input name="bankAccount" placeholder="Nomor rekening" /></label><label id="empPhotoLabel">Foto profil<input type="file" name="photo" accept="image/png,image/jpeg,image/webp" /></label><label>Auth User ID (opsional)<input name="authUserId" placeholder="UUID dari Supabase Auth" /></label><label class="approval-check"><input type="checkbox" name="isActive" checked /> Akun aktif</label></div><div class="modal-actions"><button type="button" class="secondary-button" id="copyMyUidButton">Salin UID saya</button><button type="button" class="secondary-button" id="cancelEmployeeModal">Batal</button><button class="primary-button" type="submit">Simpan karyawan</button></div></form></div>';
+const hrContactIds = ['empPhotoLabel', 'empPhoneLabel', 'empPhone2Label', 'empEmail2Label'];
+const hrSensitiveIds = ['empNpwpLabel', 'empBankLabel', 'empBankAccountLabel'];
+function refreshEmployeeFormVisibility() {
+  const contact = canViewContact();
+  const full = canViewSensitive();
+  hrContactIds.forEach((id) => { const el = document.getElementById(id); if (el) el.hidden = !contact; });
+  hrSensitiveIds.forEach((id) => { const el = document.getElementById(id); if (el) el.hidden = !full; });
+}
 document.body.append(employeeModal);
 const closeEmployeeModal = () => employeeModal.classList.remove('open');
 let editingEmployeeId = null;
-$('#addEmployeeButton').addEventListener('click', () => { editingEmployeeId = null; $('#employeeForm').reset(); employeeModal.querySelector('h2').textContent = 'Tambah karyawan'; employeeModal.classList.add('open'); });
+$('#addEmployeeButton').addEventListener('click', () => { editingEmployeeId = null; $('#employeeForm').reset(); employeeModal.querySelector('h2').textContent = 'Tambah karyawan'; refreshEmployeeFormVisibility(); employeeModal.classList.add('open'); });
 $('#closeEmployeeModal').addEventListener('click', closeEmployeeModal);
 $('#cancelEmployeeModal').addEventListener('click', closeEmployeeModal);
 employeeModal.addEventListener('click', (event) => { if (event.target === employeeModal) closeEmployeeModal(); });
@@ -298,12 +306,18 @@ async function openEmployeeEditor(employeeId) {
   $('#employeeForm select[name="access"]').value = level.charAt(0).toUpperCase() + level.slice(1);
   $('#employeeForm input[name="authUserId"]').value = emp.auth_user_id || '';
   $('#employeeForm input[name="isActive"]').checked = emp.is_active !== false;
+  if ('phone2' in emp) $('#employeeForm input[name="phone2"]').value = emp.phone2 || '';
+  if ('email2' in emp) $('#employeeForm input[name="email2"]').value = emp.email2 || '';
+  if ('npwp' in emp) $('#employeeForm input[name="npwp"]').value = emp.npwp || '';
+  if ('bank_name' in emp) $('#employeeForm input[name="bankName"]').value = emp.bank_name || '';
+  if ('bank_account_number' in emp) $('#employeeForm input[name="bankAccount"]').value = emp.bank_account_number || '';
   employeeModal.querySelector('h2').textContent = 'Edit karyawan';
+  refreshEmployeeFormVisibility();
   employeeModal.classList.add('open');
 }
 async function reloadEmployees() {
   if (!window.crmDb?.ready) return;
-  const list = await window.crmDb.getEmployees();
+  const list = isAdmin() ? await window.crmDb.getEmployees() : await window.crmDb.getEmployeesPublic();
   if (list.error) { showToast(`Daftar karyawan gagal dimuat: ${list.error.message}`, true); return; }
   $('#employeeRows').innerHTML = renderDbEmployeeRows(list.data || []);
   $('#employeeCount').textContent = `${(list.data || []).length} dari ${(list.data || []).length}`;
@@ -324,17 +338,33 @@ $('#employeeForm').addEventListener('submit', async (event) => {
     const payload = {
       full_name: form.get('name'),
       email: form.get('email'),
-      phone: form.get('phone') || null,
       position: form.get('position'),
       department: form.get('department') === 'service' ? 'Service & Teknisi' : form.get('department') === 'sales' ? 'Sales' : 'Administrasi',
       access_level: String(form.get('access') || 'operator').toLowerCase(),
       auth_user_id: form.get('authUserId') || null,
       is_active: Boolean(form.get('isActive'))
     };
+    if (canViewContact()) {
+      payload.phone = form.get('phone') || null;
+      payload.phone2 = form.get('phone2') || null;
+      payload.email2 = form.get('email2') || null;
+    }
+    if (canViewSensitive()) {
+      payload.npwp = form.get('npwp') || null;
+      payload.bank_name = form.get('bankName') || null;
+      payload.bank_account_number = form.get('bankAccount') || null;
+    }
     const result = editingEmployeeId
       ? await window.crmDb.updateEmployee(editingEmployeeId, payload)
       : await window.crmDb.createEmployee(payload);
     if (result.error) { showToast(`Karyawan belum tersimpan: ${result.error.message}`, true); return; }
+    let savedId = editingEmployeeId || result.data?.id;
+    const photoFile = form.get('photo');
+    if (photoFile?.size && savedId && canViewContact()) {
+      const photo = await window.crmDb.uploadEmployeePhoto(savedId, photoFile);
+      if (photo.error) showToast(`Karyawan tersimpan, tetapi foto gagal: ${photo.error.message}`, true);
+      else await window.crmDb.updateEmployee(savedId, { photo_url: photo.data.publicUrl });
+    }
     await reloadEmployees();
     await loadAccessLevel();
   } else {
@@ -658,11 +688,13 @@ const renderDbEmployeeRows = (employees) => employees.map((employee) => {
   const initials = employee.full_name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
   const department = employee.department.toLowerCase().includes('service') ? 'service' : employee.department.toLowerCase().includes('sales') ? 'sales' : 'admin';
   const accessClass = { administrator: 'access-admin', editor: 'access-editor', operator: 'access-operator', viewer: 'access-viewer' }[employee.access_level] || 'access-viewer';
-  return `<tr data-department="${department}" data-employee-id="${employee.id}"><td><div class="person"><div class="avatar avatar-blue">${initials}</div><div><b>${employee.full_name}</b><small>${employee.email}</small></div></div></td><td>${employee.position}</td><td>${employee.department}</td><td><span class="access ${accessClass}">${employee.access_level}</span></td><td><span class="status ${employee.is_active ? 'status-green' : 'status-gray'}">${employee.is_active ? 'Aktif' : 'Tidak aktif'}</span></td><td>${employee.last_login_at ? new Date(employee.last_login_at).toLocaleString('id-ID') : 'Belum pernah login'}</td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`;
+  return `<tr data-department="${department}" data-employee-id="${employee.id}"><td><div class="person"><div class="avatar avatar-blue"${employee.photo_url ? ` style="background-image:url('${employee.photo_url}');background-size:cover;color:transparent"` : ''}>${initials}</div><div><b>${employee.full_name}</b><small>${employee.email}</small></div></div></td><td>${employee.position}</td><td>${employee.department}</td><td><span class="access ${accessClass}">${employee.access_level}</span></td><td><span class="status ${employee.is_active ? 'status-green' : 'status-gray'}">${employee.is_active ? 'Aktif' : 'Tidak aktif'}</span></td><td>${employee.last_login_at ? new Date(employee.last_login_at).toLocaleString('id-ID') : 'Belum pernah login'}</td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`;
 }).join('');
 let quotationCache = [];
 let currentAccessLevel = 'viewer';
 const isAdmin = () => currentAccessLevel === 'administrator';
+const canViewContact = () => isAdmin() || currentAccessLevel === 'editor';
+const canViewSensitive = () => isAdmin();
 const loadAccessLevel = async () => {
   currentAccessLevel = 'viewer';
   if (!window.crmDb?.ready) return;
@@ -711,7 +743,7 @@ const printQuotation = (quote) => {
   printWindow.document.close(); printWindow.focus(); printWindow.print();
 };
 async function loadDatabaseData() {
-  const [customerResult, assetResult, scheduleResult, workOrderResult, partsResult, employeeResult, quotationResult] = await Promise.all([window.crmDb.getCustomers(), window.crmDb.getAssets(), window.crmDb.getMaintenanceSchedules(), window.crmDb.getWorkOrders(), window.crmDb.getSpareParts(), window.crmDb.getEmployees(), window.crmDb.getQuotations()]);
+  const [customerResult, assetResult, scheduleResult, workOrderResult, partsResult, employeeResult, quotationResult] = await Promise.all([window.crmDb.getCustomers(), window.crmDb.getAssets(), window.crmDb.getMaintenanceSchedules(), window.crmDb.getWorkOrders(), window.crmDb.getSpareParts(), isAdmin() ? window.crmDb.getEmployees() : window.crmDb.getEmployeesPublic(), window.crmDb.getQuotations()]);
   if (!customerResult.error && customerResult.data?.length) {
     $('#customerRows').innerHTML = renderDbCustomerRows(customerResult.data);
     $$('#customerRows .more-button').forEach((button) => button.addEventListener('click', () => openCustomerDetail(button.closest('tr'))));
