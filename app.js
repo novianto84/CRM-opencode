@@ -189,11 +189,34 @@ $('#assetSearch').addEventListener('input', filterAssets);
 $('#assetStatusFilter').addEventListener('change', filterAssets);
 $('#addAssetButton').addEventListener('click', openAssetModal);
 
-$('#assetForm').addEventListener('submit', (event) => {
+$('#assetForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = new FormData(event.target);
+  let savedAsset = null;
+  if (window.crmDb?.ready) {
+    const customerResult = await window.crmDb.findCustomerByName(form.get('customer'));
+    if (customerResult.error || !customerResult.data) { window.alert('Customer pemilik belum tersedia di database. Tambahkan customer terlebih dahulu.'); return; }
+    const assetResult = await window.crmDb.createAsset({
+      customer_id: customerResult.data.id,
+      name: `Genset ${form.get('capacity')}`,
+      generator_serial: form.get('generatorSerial'),
+      generator_type: form.get('generatorType').toLowerCase().replaceAll(' ', '_'),
+      operation_system: form.get('operationSystem').toLowerCase().replaceAll(' ', '_'),
+      operation_mode: form.get('operationMode').toLowerCase().replaceAll(' ', '_'),
+      engine_serial: form.get('engineSerial'),
+      engine_type: form.get('engineType'),
+      alternator_serial: form.get('alternatorSerial'),
+      alternator_type: form.get('alternatorType'),
+      capacity_kva: Number.parseFloat(form.get('capacity')) || null,
+      installation_date: form.get('installationDate') || null,
+      warranty_start_date: form.get('warrantyStart') || null,
+      warranty_end_date: form.get('warrantyEnd') || null
+    });
+    if (assetResult.error) { window.alert(`Aset belum tersimpan: ${assetResult.error.message}`); return; }
+    savedAsset = assetResult.data;
+  }
   const serial = form.get('generatorSerial');
-  const assetId = `AST-${new Date().getFullYear()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+  const assetId = savedAsset?.asset_code || `AST-${new Date().getFullYear()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
   const row = document.createElement('tr');
   row.dataset.status = 'operational';
   row.dataset.assetId = assetId;
@@ -344,9 +367,9 @@ const showAuthGate = () => authGate.classList.remove('hidden');
 const setupAuth = async () => {
   if (!window.crmDb?.ready) { hideAuthGate(); return; }
   const { data } = await window.supabaseClient.auth.getSession();
-  if (data.session) { hideAuthGate(); return; }
+  if (data.session) { hideAuthGate(); await loadDatabaseData(); return; }
   showAuthGate();
-  window.supabaseClient.auth.onAuthStateChange((_event, session) => { if (session) hideAuthGate(); else showAuthGate(); });
+  window.supabaseClient.auth.onAuthStateChange(async (_event, session) => { if (session) { hideAuthGate(); await loadDatabaseData(); } else showAuthGate(); });
 };
 $('#authForm').addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -364,4 +387,23 @@ $('#authSignup').addEventListener('click', async () => {
   const { error } = await window.supabaseClient.auth.signUp({ email: form.get('email'), password: form.get('password') });
   setAuthMessage(error ? error.message : 'Akun dibuat. Periksa email untuk konfirmasi login.');
 });
+const renderDbCustomerRows = (customers) => customers.map((customer) => {
+  const initials = customer.name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
+  const typeLabel = customer.customer_type === 'company' ? 'Perusahaan' : 'Perorangan';
+  const statusLabel = customer.status.charAt(0).toUpperCase() + customer.status.slice(1);
+  const statusClass = customer.status === 'active' ? 'status-green' : 'status-yellow';
+  return `<tr data-type="${customer.customer_type}"><td><div class="person"><div class="avatar avatar-blue">${initials}</div><div><b>${customer.name}</b><small>${customer.customer_code}</small></div></div></td><td><span class="customer-type ${customer.customer_type === 'company' ? 'type-company' : 'type-person'}">${typeLabel}</span></td><td>Belum diisi<br><small>Tambahkan PIC</small></td><td><b>${customer.asset_count || 0} unit</b></td><td>${customer.next_maintenance_date || 'Belum dijadwalkan'}</td><td><span class="status ${statusClass}">${statusLabel}</span></td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`;
+}).join('');
+const renderDbAssetRows = (assets) => assets.map((asset) => `<tr data-status="${asset.status}" data-asset-id="${asset.asset_code}" data-customer="${asset.customers?.name || ''}" data-capacity="${asset.capacity_kva || 'Belum dicatat'} kVA" data-last-updated="${new Date(asset.updated_at).toLocaleString('id-ID')}"><td><div class="asset-name"><span class="asset-thumb">G</span><div><b>${asset.name}</b><small><span class="asset-id">${asset.asset_code}</span> · ${asset.generator_serial}</small></div></div></td><td>Genset Diesel</td><td><span class="config-cell">${asset.generator_type}<br><small>${asset.operation_system}</small><br><small class="mode-label">${asset.operation_mode}</small></span></td><td>${asset.generator_serial}</td><td>${asset.customer_locations?.name || asset.customers?.name || 'Belum diisi'}</td><td><span class="status ${asset.status === 'active' ? 'status-green' : 'status-gray'}">${asset.status === 'active' ? 'Aktif' : 'Tidak aktif'}</span></td><td>Belum dicatat</td><td>Belum dijadwalkan</td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`).join('');
+async function loadDatabaseData() {
+  const [customerResult, assetResult] = await Promise.all([window.crmDb.getCustomers(), window.crmDb.getAssets()]);
+  if (!customerResult.error && customerResult.data?.length) {
+    $('#customerRows').innerHTML = renderDbCustomerRows(customerResult.data);
+    $$('#customerRows .more-button').forEach((button) => button.addEventListener('click', () => openCustomerDetail(button.closest('tr'))));
+  }
+  if (!assetResult.error && assetResult.data?.length) {
+    $('#assetRows').innerHTML = renderDbAssetRows(assetResult.data);
+    $$('#assetRows .more-button').forEach((button) => button.addEventListener('click', () => openAssetDetail(button.closest('tr'))));
+  }
+}
 setupAuth();
