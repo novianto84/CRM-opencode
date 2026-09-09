@@ -106,12 +106,27 @@ const renderPlainContactRows = (contacts) => contacts.map((contact) => {
   const initials = name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
   return `<tr data-contact-id="${contact.id}"><td><div class="person"><div class="avatar avatar-blue">${initials}</div><div><b>${name}</b><small>${contact.email || contact.phone || '-'}</small></div></div></td><td><span class="status status-blue">PIC</span></td><td>-</td><td>${contact.phone || '-'}</td><td><b>${contact.position || '-'}</b></td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`;
 }).join('');
+function paintContactTables(html, count) {
+  $('#contactRows').innerHTML = html;
+  const directoryRows = $('#contactDirectoryRows');
+  if (directoryRows) directoryRows.innerHTML = html;
+  const directoryCount = $('#contactDirectoryCount');
+  if (directoryCount) directoryCount.textContent = `${count} contact terhubung ke customer`;
+}
 async function loadContactDirectory() {
   if (!window.crmDb?.ready) return null;
   const dir = await window.crmDb.getContactDirectory();
-  if (!dir.error && dir.data?.length) { $('#contactRows').innerHTML = renderDbContactRows(dir.data); return null; }
+  if (!dir.error && dir.data?.length) {
+    const grouped = new Map();
+    dir.data.forEach((rel) => {
+      const key = rel.contacts?.id || rel.id;
+      if (!grouped.has(key)) grouped.set(key, true);
+    });
+    paintContactTables(renderDbContactRows(dir.data), grouped.size);
+    return null;
+  }
   const plain = await window.crmDb.getContacts();
-  if (!plain.error && plain.data?.length) { $('#contactRows').innerHTML = renderPlainContactRows(plain.data); return null; }
+  if (!plain.error && plain.data?.length) { paintContactTables(renderPlainContactRows(plain.data), plain.data.length); return null; }
   return dir.error || plain.error || null;
 }
 async function reloadContactDirectory() {
@@ -148,11 +163,18 @@ async function openContactEditor(contactId) {
     : '<div class="detail-pic"><div><b>Belum terhubung</b><small>Hubungkan via detail customer</small></div></div>';
   contactEditorModal.classList.add('open');
 }
-$('#contactRows').addEventListener('click', (event) => {
+const handleDirectoryClick = (event) => {
   const button = event.target.closest('.more-button');
   const row = button?.closest('tr');
   if (row?.dataset.contactId) openContactEditor(row.dataset.contactId);
+};
+$('#contactRows').addEventListener('click', handleDirectoryClick);
+$('#contactDirectoryRows').addEventListener('click', handleDirectoryClick);
+$('#contactDirectorySearch').addEventListener('input', (event) => {
+  const query = event.target.value.toLowerCase();
+  $$('#contactDirectoryRows tr').forEach((row) => { row.hidden = !row.textContent.toLowerCase().includes(query); });
 });
+$('#addContactButton2').addEventListener('click', openModal);
 $('#contactCustomerLinks').addEventListener('click', async (event) => {
   const button = event.target.closest('.delete-pic');
   if (!button) return;
@@ -228,11 +250,12 @@ $$('.nav-item').forEach((item) => item.addEventListener('click', () => {
     const isAsset = module === 'Asset';
     const isEmployee = module === 'Karyawan';
     const isCustomer = module === 'Customer';
+    const isContact = module === 'Kontak';
     const isMaintenance = module === 'Maintenance';
     const isWorkOrder = module === 'SPK';
     const isInventory = module === 'Inventory';
-    $('#overviewView').hidden = isCompany || isAsset || isEmployee || isCustomer || isMaintenance || isWorkOrder || isInventory;
-    $('#companyView').hidden = !isCompany;
+    $('#overviewView').hidden = isCompany || isAsset || isEmployee || isCustomer || isContact || isMaintenance || isWorkOrder || isInventory;
+    $('#contactView').hidden = !isContact;
     $('#assetView').hidden = !isAsset;
     $('#employeeView').hidden = !isEmployee;
     $('#customerView').hidden = !isCustomer;
