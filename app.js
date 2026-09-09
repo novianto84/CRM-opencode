@@ -113,21 +113,34 @@ function paintContactTables(html, count) {
   const directoryCount = $('#contactDirectoryCount');
   if (directoryCount) directoryCount.textContent = `${count} contact terhubung ke customer`;
 }
+const withTimeout = (promise, ms, label) => Promise.race([
+  promise,
+  new Promise((_, reject) => window.setTimeout(() => reject(new Error(`${label} timeout setelah ${ms / 1000} detik`)), ms))
+]);
+const setDirectoryStatus = (text) => { const el = $('#contactDirectoryCount'); if (el) el.textContent = text; };
 async function loadContactDirectory() {
-  if (!window.crmDb?.ready) return null;
-  const dir = await window.crmDb.getContactDirectory();
-  if (!dir.error && dir.data?.length) {
-    const grouped = new Map();
-    dir.data.forEach((rel) => {
-      const key = rel.contacts?.id || rel.id;
-      if (!grouped.has(key)) grouped.set(key, true);
-    });
-    paintContactTables(renderDbContactRows(dir.data), grouped.size);
-    return null;
+  if (!window.crmDb?.ready) { setDirectoryStatus('Database belum terhubung (mode demo).'); return null; }
+  try {
+    const dir = await withTimeout(window.crmDb.getContactDirectory(), 15000, 'Direktori kontak');
+    if (!dir.error && dir.data?.length) {
+      const grouped = new Map();
+      dir.data.forEach((rel) => {
+        const key = rel.contacts?.id || rel.id;
+        if (!grouped.has(key)) grouped.set(key, true);
+      });
+      paintContactTables(renderDbContactRows(dir.data), grouped.size);
+      return null;
+    }
+    if (!dir.error) { setDirectoryStatus('Belum ada contact di database. Tambahkan via Kelola PIC atau Tambah kontak.'); return null; }
+    const plain = await withTimeout(window.crmDb.getContacts(), 15000, 'Daftar contacts');
+    if (!plain.error && plain.data?.length) { paintContactTables(renderPlainContactRows(plain.data), plain.data.length); return null; }
+    const err = dir.error || plain.error;
+    setDirectoryStatus(`Gagal memuat: ${err?.message || 'unknown error'}`);
+    return err;
+  } catch (err) {
+    setDirectoryStatus(`Gagal memuat: ${err?.message || err}`);
+    return err instanceof Error ? err : new Error(String(err));
   }
-  const plain = await window.crmDb.getContacts();
-  if (!plain.error && plain.data?.length) { paintContactTables(renderPlainContactRows(plain.data), plain.data.length); return null; }
-  return dir.error || plain.error || null;
 }
 async function reloadContactDirectory() {
   const err = await loadContactDirectory();
@@ -891,7 +904,18 @@ const printQuotation = (quote) => {
   printWindow.document.close(); printWindow.focus(); printWindow.print();
 };
 async function loadDatabaseData() {
-  const [customerResult, assetResult, scheduleResult, workOrderResult, partsResult, employeeResult, quotationResult] = await Promise.all([window.crmDb.getCustomers(), window.crmDb.getAssets(), window.crmDb.getMaintenanceSchedules(), window.crmDb.getWorkOrders(), window.crmDb.getSpareParts(), isAdmin() ? window.crmDb.getEmployees() : window.crmDb.getEmployeesPublic(), window.crmDb.getQuotations()]);
+  let customerResult = { error: new Error('belum dimuat') };
+  let assetResult = { error: new Error('belum dimuat') };
+  let scheduleResult = { error: new Error('belum dimuat') };
+  let workOrderResult = { error: new Error('belum dimuat') };
+  let partsResult = { error: new Error('belum dimuat') };
+  let employeeResult = { error: new Error('belum dimuat') };
+  let quotationResult = { error: new Error('belum dimuat') };
+  try {
+    [customerResult, assetResult, scheduleResult, workOrderResult, partsResult, employeeResult, quotationResult] = await Promise.all([window.crmDb.getCustomers(), window.crmDb.getAssets(), window.crmDb.getMaintenanceSchedules(), window.crmDb.getWorkOrders(), window.crmDb.getSpareParts(), isAdmin() ? window.crmDb.getEmployees() : window.crmDb.getEmployeesPublic(), window.crmDb.getQuotations()]);
+  } catch (err) {
+    showDatabaseWarning([`Sistem: ${err?.message || err}`]);
+  }
   if (!customerResult.error && customerResult.data?.length) {
     $('#customerRows').innerHTML = renderDbCustomerRows(customerResult.data);
     $$('#customerRows .more-button').forEach((button) => button.addEventListener('click', () => openCustomerDetail(button.closest('tr'))));
