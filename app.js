@@ -460,7 +460,8 @@ $('#authSignup').addEventListener('click', async () => {
   if (password.length < 6) { setAuthMessage('Password minimal 6 karakter.', true); return; }
   button.disabled = true;
   setAuthMessage('Membuat akun...');
-  const { data, error } = await window.supabaseClient.auth.signUp({ email, password });
+  const emailRedirectTo = `${window.location.origin}${window.location.pathname}`;
+  const { data, error } = await window.supabaseClient.auth.signUp({ email, password, options: { emailRedirectTo } });
   button.disabled = false;
   if (error) {
     const message = error.message.toLowerCase().includes('already registered') ? 'Email ini sudah terdaftar. Gunakan tombol Masuk.' : error.message;
