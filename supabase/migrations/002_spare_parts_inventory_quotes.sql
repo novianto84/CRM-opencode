@@ -44,6 +44,10 @@ create table if not exists public.inventory_movements (
   created_at timestamptz not null default now()
 );
 
+insert into public.warehouses (code, name)
+values ('MAIN', 'Gudang Utama')
+on conflict (code) do nothing;
+
 alter table public.maintenance_parts
   add column if not exists warehouse_id uuid references public.warehouses(id) on delete restrict,
   add column if not exists inventory_movement_id uuid references public.inventory_movements(id) on delete set null;

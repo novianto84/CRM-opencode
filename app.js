@@ -679,3 +679,31 @@ $('#quotationForm').addEventListener('submit', async (event) => {
   event.target.reset();
   closeQuotationModal();
 });
+
+const stockModal = document.createElement('div');
+stockModal.className = 'modal-backdrop';
+stockModal.innerHTML = '<div class="modal inventory-modal"><div class="modal-header"><div><p class="eyebrow">INVENTORY MOVEMENT</p><h2>Catat stok masuk</h2></div><button class="icon-button" id="closeStockModal"><svg><use href="#i-close"/></svg></button></div><form id="stockForm"><label>Spare part<select required name="part" id="stockPartSelect"></select></label><label>Gudang<select required name="warehouse" id="stockWarehouseSelect"></select></label><div class="stock-form-grid"><label>Jenis transaksi<select name="movementType"><option value="inbound">Stok masuk</option><option value="adjustment">Adjustment</option></select></label><label>Jumlah<input required type="number" min="0.01" step="0.01" name="quantity" placeholder="Contoh: 20" /></label><label>Harga satuan<input type="number" min="0" name="unitCost" placeholder="Rp" /></label><label>Catatan<input name="notes" placeholder="Supplier / alasan adjustment" /></label></div><div class="modal-actions"><button type="button" class="secondary-button" id="cancelStockModal">Batal</button><button class="primary-button" type="submit">Simpan pergerakan</button></div></form></div>';
+document.body.append(stockModal);
+const closeStockModal = () => stockModal.classList.remove('open');
+const refreshStockOptions = async () => {
+  $('#stockPartSelect').innerHTML = $$('#partRows tr').map((row) => `<option value="${row.dataset.sparePartId || ''}">${row.querySelector('.part-code')?.textContent || 'Spare part'}</option>`).filter((option) => !option.includes('value=""')).join('');
+  if (window.crmDb?.ready) {
+    const result = await window.crmDb.getWarehouses();
+    $('#stockWarehouseSelect').innerHTML = result.data?.map((warehouse) => `<option value="${warehouse.id}">${warehouse.name}</option>`).join('') || '<option value="">Migration gudang belum dijalankan</option>';
+  } else $('#stockWarehouseSelect').innerHTML = '<option value="">Demo warehouse</option>';
+};
+$('#addStockButton').addEventListener('click', async () => { await refreshStockOptions(); stockModal.classList.add('open'); });
+$('#closeStockModal').addEventListener('click', closeStockModal);
+$('#cancelStockModal').addEventListener('click', closeStockModal);
+stockModal.addEventListener('click', (event) => { if (event.target === stockModal) closeStockModal(); });
+$('#stockForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = new FormData(event.target);
+  if (window.crmDb?.ready && (!form.get('part') || !form.get('warehouse'))) { window.alert('Migration inventory atau master spare part belum siap.'); return; }
+  if (window.crmDb?.ready) {
+    const result = await window.crmDb.createInventoryMovement({ spare_part_id: form.get('part'), warehouse_id: form.get('warehouse'), movement_type: form.get('movementType'), quantity: Number(form.get('quantity')), unit_cost: Number(form.get('unitCost')) || 0, notes: form.get('notes') || null });
+    if (result.error) { window.alert(`Pergerakan stok belum tersimpan: ${result.error.message}`); return; }
+  }
+  event.target.reset();
+  closeStockModal();
+});
