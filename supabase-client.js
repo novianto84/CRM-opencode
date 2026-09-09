@@ -25,6 +25,14 @@
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('customers').update(payload).eq('id', id).select().single();
     },
+    async uploadCustomerLogo(customerId, file) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      const path = `${customerId}/${Date.now()}-${file.name.replace(/[^a-z0-9.\-_]/gi, '-')}`;
+      const upload = await window.supabaseClient.storage.from('company-logos').upload(path, file, { upsert: true, contentType: file.type });
+      if (upload.error) return { data: null, error: upload.error };
+      const { data } = window.supabaseClient.storage.from('company-logos').getPublicUrl(path);
+      return { data: { publicUrl: data.publicUrl }, error: null };
+    },
     async getCustomerContacts(customerId) {
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('customer_contacts').select('*, contacts(*)').eq('customer_id', customerId).eq('is_active', true).order('is_primary', { ascending: false });

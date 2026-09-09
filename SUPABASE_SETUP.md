@@ -4,6 +4,7 @@ Schema database CRM tersedia di `supabase/schema.sql`.
 
 Inventory spare part dan quotation tambahan tersedia di `supabase/migrations/002_spare_parts_inventory_quotes.sql` dan dijalankan setelah schema utama.
 Relasi contact/PIC tersedia di `supabase/migrations/003_contacts_relations.sql` dan dijalankan setelah migration inventory.
+Profil customer dan logo tersedia di `supabase/migrations/004_customer_profile.sql` dan dijalankan setelah migration contact.
 
 ## Membuat Database
 
@@ -14,6 +15,7 @@ Relasi contact/PIC tersedia di `supabase/migrations/003_contacts_relations.sql` 
 5. Pastikan tabel dan view `customer_summary` sudah muncul di **Table Editor**.
 6. Jalankan query `supabase/migrations/002_spare_parts_inventory_quotes.sql` untuk mengaktifkan stok, histori pergerakan, dan quotation.
 7. Jalankan query `supabase/migrations/003_contacts_relations.sql` untuk memisahkan data contact dari relasi customer.
+8. Jalankan query `supabase/migrations/004_customer_profile.sql` untuk mengaktifkan NPWP dan storage logo customer.
 
 ## Struktur Utama
 

@@ -65,6 +65,8 @@ create table public.customers (
   email text,
   address text,
   notes text,
+  npwp text,
+  logo_url text,
   created_by uuid references public.employees(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
