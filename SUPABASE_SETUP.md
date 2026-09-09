@@ -29,4 +29,17 @@ Schema database CRM tersedia di `supabase/schema.sql`.
 
 Schema mengaktifkan Row Level Security dan memberi akses awal kepada user yang sudah login. Policy ini sengaja sederhana untuk tahap pengembangan. Sebelum production, policy perlu diperketat berdasarkan `access_level` pada tabel `employees`.
 
-Data frontend saat ini belum otomatis tersambung ke Supabase. Tahap berikutnya adalah menambahkan Supabase client, environment variable, login, lalu mengganti data mock dengan query ke tabel-tabel ini.
+## Koneksi Frontend
+
+Adapter frontend sudah tersedia di `supabase-client.js`. Untuk mengaktifkan koneksi:
+
+1. Salin `supabase-config.example.js` menjadi `supabase-config.js`.
+2. Isi `url` dan `anonKey` dari **Project Settings > API**.
+3. Jangan gunakan `service_role` key di browser.
+4. Tambahkan kembali script konfigurasi di `index.html` sebelum `supabase-client.js`:
+
+```html
+<script src="supabase-config.js"></script>
+```
+
+Sebelum dipakai production, login Supabase dan policy RLS berbasis role harus diaktifkan. Tanpa konfigurasi, aplikasi tetap berjalan dalam mode demo dan tidak mengubah database.
