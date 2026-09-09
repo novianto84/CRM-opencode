@@ -97,6 +97,10 @@
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('quotation_items').insert(payload).select().single();
     },
+    async getQuotations() {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('quotations').select('*, customers(name), quotation_items(*)').order('created_at', { ascending: false });
+    },
     async getEmployees() {
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('employees').select('*').order('full_name');

@@ -475,8 +475,18 @@ const renderDbEmployeeRows = (employees) => employees.map((employee) => {
   const accessClass = { administrator: 'access-admin', editor: 'access-editor', operator: 'access-operator', viewer: 'access-viewer' }[employee.access_level] || 'access-viewer';
   return `<tr data-department="${department}" data-employee-id="${employee.id}"><td><div class="person"><div class="avatar avatar-blue">${initials}</div><div><b>${employee.full_name}</b><small>${employee.email}</small></div></div></td><td>${employee.position}</td><td>${employee.department}</td><td><span class="access ${accessClass}">${employee.access_level}</span></td><td><span class="status ${employee.is_active ? 'status-green' : 'status-gray'}">${employee.is_active ? 'Aktif' : 'Tidak aktif'}</span></td><td>${employee.last_login_at ? new Date(employee.last_login_at).toLocaleString('id-ID') : 'Belum pernah login'}</td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`;
 }).join('');
+let quotationCache = [];
+const formatRupiah = (value) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
+const renderQuotations = (quotations) => quotations.slice(0, 5).map((quote) => `<div><span class="quotation-code">${quote.quotation_code}</span><div><b>${quote.customers?.name || 'Customer'}</b><small>${quote.quotation_items?.map((item) => `${item.description} x ${item.quantity}`).join(' · ') || 'Belum ada item'}</small></div><strong>${formatRupiah(quote.total)}</strong><span class="status status-${quote.status === 'approved' ? 'green' : quote.status === 'sent' ? 'yellow' : 'gray'}">${quote.status}</span><button class="more-button print-quotation" data-quotation-id="${quote.id}" title="Cetak"><svg><use href="#i-more"/></svg></button></div>`).join('');
+const printQuotation = (quote) => {
+  const items = quote.quotation_items || [];
+  const printWindow = window.open('', '_blank', 'width=900,height=700');
+  if (!printWindow) return;
+  printWindow.document.write(`<title>${quote.quotation_code}</title><style>body{font:14px Arial;color:#182235;max-width:800px;margin:40px auto}h1{margin-bottom:4px}table{width:100%;border-collapse:collapse;margin-top:28px}th,td{padding:10px;border-bottom:1px solid #ddd;text-align:left}td:last-child,th:last-child{text-align:right}.total{text-align:right;font-size:18px;font-weight:bold;margin-top:20px}</style><h1>Penawaran ${quote.quotation_code}</h1><p>Customer: <b>${quote.customers?.name || '-'}</b><br>Berlaku sampai: ${quote.valid_until || '-'}</p><table><thead><tr><th>Deskripsi</th><th>Jumlah</th><th>Harga</th><th>Total</th></tr></thead><tbody>${items.map((item) => `<tr><td>${item.description}</td><td>${item.quantity} ${item.unit}</td><td>${formatRupiah(item.unit_price)}</td><td>${formatRupiah(item.line_total)}</td></tr>`).join('')}</tbody></table><p class="total">Total: ${formatRupiah(quote.total)}</p>`);
+  printWindow.document.close(); printWindow.focus(); printWindow.print();
+};
 async function loadDatabaseData() {
-  const [customerResult, assetResult, scheduleResult, workOrderResult, partsResult, employeeResult] = await Promise.all([window.crmDb.getCustomers(), window.crmDb.getAssets(), window.crmDb.getMaintenanceSchedules(), window.crmDb.getWorkOrders(), window.crmDb.getSpareParts(), window.crmDb.getEmployees()]);
+  const [customerResult, assetResult, scheduleResult, workOrderResult, partsResult, employeeResult, quotationResult] = await Promise.all([window.crmDb.getCustomers(), window.crmDb.getAssets(), window.crmDb.getMaintenanceSchedules(), window.crmDb.getWorkOrders(), window.crmDb.getSpareParts(), window.crmDb.getEmployees(), window.crmDb.getQuotations()]);
   if (!customerResult.error && customerResult.data?.length) {
     $('#customerRows').innerHTML = renderDbCustomerRows(customerResult.data);
     $$('#customerRows .more-button').forEach((button) => button.addEventListener('click', () => openCustomerDetail(button.closest('tr'))));
@@ -501,6 +511,10 @@ async function loadDatabaseData() {
   if (!employeeResult.error && employeeResult.data?.length) {
     $('#employeeRows').innerHTML = renderDbEmployeeRows(employeeResult.data);
     $('#employeeCount').textContent = `${employeeResult.data.length} dari ${employeeResult.data.length}`;
+  }
+  if (!quotationResult.error && quotationResult.data?.length) {
+    quotationCache = quotationResult.data;
+    $('#quotationList').innerHTML = renderQuotations(quotationCache);
   }
 }
 setupAuth();
@@ -679,6 +693,7 @@ const quotationModal = document.createElement('div');
 quotationModal.className = 'modal-backdrop';
 quotationModal.innerHTML = '<div class="modal inventory-modal"><div class="modal-header"><div><p class="eyebrow">QUOTATION</p><h2>Buat penawaran</h2></div><button class="icon-button" id="closeQuotationModal"><svg><use href="#i-close"/></svg></button></div><form id="quotationForm"><label>Customer<select required name="customer" id="quotationCustomerSelect"></select></label><label>Deskripsi penawaran<input required name="description" placeholder="Spare part dan jasa maintenance" /></label><div class="quotation-form-grid"><label>Jumlah<input required type="number" min="1" name="quantity" value="1" /></label><label>Harga satuan<input required type="number" min="0" name="unitPrice" placeholder="Rp" /></label><label>Berlaku sampai<input type="date" name="validUntil" /></label></div><div class="modal-actions"><button type="button" class="secondary-button" id="cancelQuotationModal">Batal</button><button class="primary-button" type="submit">Simpan penawaran</button></div></form></div>';
 document.body.append(quotationModal);
+$('#quotationList').addEventListener('click', (event) => { const button = event.target.closest('.print-quotation'); if (button) printQuotation(quotationCache.find((quote) => quote.id === button.dataset.quotationId)); });
 const closeQuotationModal = () => quotationModal.classList.remove('open');
 $('#createQuotationButton').addEventListener('click', () => { $('#quotationCustomerSelect').innerHTML = $$('#customerRows tr').map((row) => `<option value="${row.dataset.customerId}">${row.querySelector('.person b')?.textContent || 'Customer'}</option>`).join(''); quotationModal.classList.add('open'); });
 $('#closeQuotationModal').addEventListener('click', closeQuotationModal);
