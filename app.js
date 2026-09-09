@@ -98,7 +98,7 @@ const renderDbContactRows = (relations) => {
     const initials = name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
     const email = contact.email || fallback.email || '';
     const phone = contact.phone || contact.whatsapp || fallback.phone || '';
-    return `<tr><td><div class="person"><div class="avatar avatar-blue">${initials}</div><div><b>${name}</b><small>${email || phone || '-'}</small></div></div></td><td><span class="status ${primary ? 'status-green' : 'status-blue'}">${primary ? 'PIC Utama' : 'PIC'}</span></td><td>${uniq(customers).join(', ') || '-'}</td><td>${phone || '-'}</td><td><b>${uniq(roles).join(', ') || '-'}</b></td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`;
+    return `<tr data-contact-id="${key}"><td><div class="person"><div class="avatar avatar-blue">${initials}</div><div><b>${name}</b><small>${email || phone || '-'}</small></div></div></td><td><span class="status ${primary ? 'status-green' : 'status-blue'}">${primary ? 'PIC Utama' : 'PIC'}</span></td><td>${uniq(customers).join(', ') || '-'}</td><td>${phone || '-'}</td><td><b>${uniq(roles).join(', ') || '-'}</b></td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`;
   }).join('');
 };
 async function reloadContactDirectory() {
@@ -107,6 +107,73 @@ async function reloadContactDirectory() {
   if (dir.error) { showToast(`Daftar kontak gagal dimuat: ${dir.error.message}`, true); return; }
   if (dir.data?.length) $('#contactRows').innerHTML = renderDbContactRows(dir.data);
 }
+const contactEditorModal = document.createElement('div');
+contactEditorModal.className = 'modal-backdrop';
+contactEditorModal.innerHTML = '<div class="modal relation-modal"><div class="modal-header"><div><p class="eyebrow">CONTACT DETAIL</p><h2>Edit contact</h2></div><button class="icon-button" id="closeContactEditor"><svg><use href="#i-close"/></svg></button></div><form id="contactEditorForm"><label>Nama lengkap<input required name="name" placeholder="Nama lengkap" /></label><label>Jabatan<input name="position" placeholder="Jabatan" /></label><label>No. telepon<input name="phone" placeholder="0812 0000 0000" /></label><label>WhatsApp<input name="whatsapp" placeholder="Nomor WhatsApp" /></label><label>Email<input type="email" name="email" placeholder="email@customer.com" /></label><label>Nomor identitas<input name="identityNumber" placeholder="KTP / identitas lain" /></label><label>Tanggal lahir<input type="date" name="birthDate" /></label><label>Alamat<input name="contactAddress" placeholder="Alamat tinggal" /></label><label>Catatan<textarea name="contactNotes" rows="2" placeholder="Catatan tambahan"></textarea></label><div class="detail-section-heading"><h3>Customer terhubung</h3></div><div class="customer-contact-list" id="contactCustomerLinks"></div><div class="modal-actions"><button type="button" class="secondary-button" id="cancelContactEditor">Batal</button><button class="primary-button" type="submit">Simpan perubahan</button></div></form></div>';
+document.body.append(contactEditorModal);
+let editingContactId = null;
+const closeContactEditor = () => contactEditorModal.classList.remove('open');
+$('#closeContactEditor').addEventListener('click', closeContactEditor);
+$('#cancelContactEditor').addEventListener('click', closeContactEditor);
+contactEditorModal.addEventListener('click', (event) => { if (event.target === contactEditorModal) closeContactEditor(); });
+async function openContactEditor(contactId) {
+  if (!window.crmDb?.ready || !contactId) { showToast('Data demo tidak dapat diedit.', true); return; }
+  const [contactResult, linksResult] = await Promise.all([window.crmDb.getContact(contactId), window.crmDb.getContactCustomers(contactId)]);
+  if (contactResult.error) { showToast(`Data contact gagal dimuat: ${contactResult.error.message}`, true); return; }
+  const contact = contactResult.data;
+  editingContactId = contact.id;
+  $('#contactEditorForm input[name="name"]').value = contact.full_name || '';
+  $('#contactEditorForm input[name="position"]').value = contact.position || '';
+  $('#contactEditorForm input[name="phone"]').value = contact.phone || '';
+  $('#contactEditorForm input[name="whatsapp"]').value = contact.whatsapp || '';
+  $('#contactEditorForm input[name="email"]').value = contact.email || '';
+  $('#contactEditorForm input[name="identityNumber"]').value = contact.identity_number || '';
+  $('#contactEditorForm input[name="birthDate"]').value = contact.birth_date || '';
+  $('#contactEditorForm input[name="contactAddress"]').value = contact.address || '';
+  $('#contactEditorForm textarea[name="contactNotes"]').value = contact.notes || '';
+  const links = linksResult.data || [];
+  $('#contactCustomerLinks').innerHTML = links.length
+    ? links.map((link) => `<div class="detail-pic"><div><b>${link.customers?.name || '-'}</b><small>${link.role || 'PIC'}${link.is_primary ? ' · Utama' : ''}</small></div>${isAdmin() ? `<button class="icon-button delete-pic" data-relation-id="${link.id}" data-pic-name="${contact.full_name}" title="Lepaskan dari customer">✕</button>` : ''}</div>`).join('')
+    : '<div class="detail-pic"><div><b>Belum terhubung</b><small>Hubungkan via detail customer</small></div></div>';
+  contactEditorModal.classList.add('open');
+}
+$('#contactRows').addEventListener('click', (event) => {
+  const button = event.target.closest('.more-button');
+  const row = button?.closest('tr');
+  if (row?.dataset.contactId) openContactEditor(row.dataset.contactId);
+});
+$('#contactCustomerLinks').addEventListener('click', async (event) => {
+  const button = event.target.closest('.delete-pic');
+  if (!button) return;
+  if (!isAdmin()) { showToast('Hanya administrator yang dapat melepas relasi.', true); return; }
+  if (!window.confirm(`Lepaskan ${button.dataset.picName} dari customer ini?`)) return;
+  const result = await window.crmDb.updateCustomerContact(button.dataset.relationId, { is_active: false });
+  if (result.error) { showToast(`Relasi gagal dilepas: ${result.error.message}`, true); return; }
+  showToast('Relasi berhasil dilepas.');
+  closeContactEditor();
+  await reloadContactDirectory();
+});
+$('#contactEditorForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!editingContactId) return;
+  const form = new FormData(event.target);
+  const result = await window.crmDb.updateContact(editingContactId, {
+    full_name: form.get('name'),
+    position: form.get('position') || null,
+    phone: form.get('phone') || null,
+    whatsapp: form.get('whatsapp') || null,
+    email: form.get('email') || null,
+    identity_number: form.get('identityNumber') || null,
+    birth_date: form.get('birthDate') || null,
+    address: form.get('contactAddress') || null,
+    notes: form.get('contactNotes') || null
+  });
+  if (result.error) { showToast(`Contact belum tersimpan: ${result.error.message}`, true); return; }
+  closeContactEditor();
+  showToast('Contact berhasil diperbarui.');
+  editingContactId = null;
+  await reloadContactDirectory();
+});
 $('#contactForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = new FormData(event.target);
