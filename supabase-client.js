@@ -68,6 +68,22 @@
     async createMaintenanceRecord(payload) {
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('maintenance_records').insert(payload).select().single();
+    },
+    async getSpareParts() {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('spare_part_inventory').select('*').order('part_code');
+    },
+    async createSparePart(payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('spare_parts').insert(payload).select().single();
+    },
+    async createQuotation(payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('quotations').insert(payload).select().single();
+    },
+    async createQuotationItem(payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('quotation_items').insert(payload).select().single();
     }
   };
 

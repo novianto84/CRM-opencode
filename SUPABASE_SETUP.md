@@ -2,6 +2,8 @@
 
 Schema database CRM tersedia di `supabase/schema.sql`.
 
+Inventory spare part dan quotation tambahan tersedia di `supabase/migrations/002_spare_parts_inventory_quotes.sql` dan dijalankan setelah schema utama.
+
 ## Membuat Database
 
 1. Buat project baru di [Supabase](https://supabase.com).
@@ -9,6 +11,7 @@ Schema database CRM tersedia di `supabase/schema.sql`.
 3. Salin seluruh isi `supabase/schema.sql`.
 4. Jalankan query.
 5. Pastikan tabel dan view `customer_summary` sudah muncul di **Table Editor**.
+6. Jalankan query `supabase/migrations/002_spare_parts_inventory_quotes.sql` untuk mengaktifkan stok, histori pergerakan, dan quotation.
 
 ## Struktur Utama
 
@@ -24,6 +27,11 @@ Schema database CRM tersedia di `supabase/schema.sql`.
 - `maintenance_parts`: suku cadang yang dipakai pada pekerjaan.
 - `employees`: user internal dan level akses.
 - `audit_logs`: histori perubahan record.
+- `warehouses`: gudang atau lokasi penyimpanan spare part.
+- `inventory_movements`: transaksi stok masuk, keluar, dan adjustment.
+- `spare_part_inventory`: view stok aktual berdasarkan pergerakan.
+- `quotations`: header penawaran customer.
+- `quotation_items`: detail spare part atau jasa di dalam penawaran.
 
 ## Catatan Keamanan
 

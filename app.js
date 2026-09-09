@@ -110,13 +110,15 @@ $$('.nav-item').forEach((item) => item.addEventListener('click', () => {
     const isCustomer = module === 'Customer';
     const isMaintenance = module === 'Maintenance';
     const isWorkOrder = module === 'SPK';
-    $('#overviewView').hidden = isCompany || isAsset || isEmployee || isCustomer || isMaintenance || isWorkOrder;
+    const isInventory = module === 'Inventory';
+    $('#overviewView').hidden = isCompany || isAsset || isEmployee || isCustomer || isMaintenance || isWorkOrder || isInventory;
     $('#companyView').hidden = !isCompany;
     $('#assetView').hidden = !isAsset;
     $('#employeeView').hidden = !isEmployee;
     $('#customerView').hidden = !isCustomer;
     $('#maintenanceView').hidden = !isMaintenance;
     $('#workOrderView').hidden = !isWorkOrder;
+    $('#inventoryView').hidden = !isInventory;
   }
   $('#sidebar').classList.remove('open');
 }));
@@ -462,8 +464,9 @@ const renderDbMaintenanceRows = (schedules) => schedules.map((schedule) => {
   return `<tr data-maintenance-status="planned"><td><div class="schedule-name"><span class="schedule-icon schedule-blue">◷</span><div><b>${schedule.title}</b><small>${schedule.id.slice(0, 8).toUpperCase()}</small></div></div></td><td>${schedule.assets?.name || '-'}<br><small>${schedule.assets?.generator_serial || schedule.assets?.asset_code || '-'}</small></td><td>${schedule.assets?.customers?.name || '-'}</td><td>${type}</td><td>${dueDate}</td><td>Belum ditugaskan</td><td><span class="status status-blue">Terjadwal</span></td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`;
 }).join('');
 const renderDbWorkOrderRows = (orders) => orders.map((order) => `<tr data-workorder-status="${order.status}" data-workorder-id="${order.id}" data-asset-db-id="${order.assets?.id || ''}"><td><span class="workorder-code">${order.work_order_code}</span></td><td><b>${order.customers?.name || '-'}</b><small>${order.assets?.name || 'Belum ada aset'}</small></td><td>${order.title}</td><td>Belum ditugaskan</td><td>${order.scheduled_at ? new Date(order.scheduled_at).toLocaleDateString('id-ID') : 'Belum dijadwalkan'}</td><td><span class="status status-blue">${order.status.replaceAll('_', ' ')}</span></td><td>${new Date(order.updated_at).toLocaleDateString('id-ID')}</td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`).join('');
+const renderDbPartRows = (parts) => parts.map((part) => `<tr data-stock="${part.stock_on_hand <= part.minimum_stock ? 'low' : 'safe'}"><td><span class="part-code">${part.part_code}</span></td><td><b>${part.name}</b><small>${part.unit}</small></td><td>Spare part</td><td>Terdaftar di database</td><td><strong class="${part.stock_on_hand <= part.minimum_stock ? 'warning-text' : ''}">${part.stock_on_hand} ${part.unit}</strong></td><td>${part.minimum_stock} ${part.unit}</td><td>Belum diatur</td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`).join('');
 async function loadDatabaseData() {
-  const [customerResult, assetResult, scheduleResult, workOrderResult] = await Promise.all([window.crmDb.getCustomers(), window.crmDb.getAssets(), window.crmDb.getMaintenanceSchedules(), window.crmDb.getWorkOrders()]);
+  const [customerResult, assetResult, scheduleResult, workOrderResult, partsResult] = await Promise.all([window.crmDb.getCustomers(), window.crmDb.getAssets(), window.crmDb.getMaintenanceSchedules(), window.crmDb.getWorkOrders(), window.crmDb.getSpareParts()]);
   if (!customerResult.error && customerResult.data?.length) {
     $('#customerRows').innerHTML = renderDbCustomerRows(customerResult.data);
     $$('#customerRows .more-button').forEach((button) => button.addEventListener('click', () => openCustomerDetail(button.closest('tr'))));
@@ -480,6 +483,10 @@ async function loadDatabaseData() {
     $('#workOrderRows').innerHTML = renderDbWorkOrderRows(workOrderResult.data);
     $('#workOrderCount').textContent = `${workOrderResult.data.length} dari ${workOrderResult.data.length}`;
     $$('#workOrderRows .more-button').forEach((button) => button.addEventListener('click', () => openWorkOrderReport(button.closest('tr'))));
+  }
+  if (!partsResult.error && partsResult.data?.length) {
+    $('#partRows').innerHTML = renderDbPartRows(partsResult.data);
+    $('#partCount').textContent = `${partsResult.data.length} dari ${partsResult.data.length}`;
   }
 }
 setupAuth();
@@ -604,4 +611,61 @@ $('#reportForm').addEventListener('submit', async (event) => {
   activeWorkOrderRow.cells[6].textContent = 'Baru saja';
   event.target.reset();
   closeReportModal();
+});
+
+const partModal = document.createElement('div');
+partModal.className = 'modal-backdrop';
+partModal.innerHTML = '<div class="modal inventory-modal"><div class="modal-header"><div><p class="eyebrow">MASTER SPARE PART</p><h2>Tambah spare part</h2></div><button class="icon-button" id="closePartModal"><svg><use href="#i-close"/></svg></button></div><form id="partForm"><div class="part-form-grid"><label>Part number<input required name="partCode" placeholder="Contoh: FLT-OLI-125" /></label><label>Nama part<input required name="name" placeholder="Nama spare part" /></label><label>Brand<input name="brand" placeholder="Contoh: Fleetguard" /></label><label>Kategori<input name="category" placeholder="Filter / Electrical" /></label><label>Unit<select name="unit"><option>pcs</option><option>liter</option><option>set</option><option>unit</option></select></label><label>Minimum stok<input required type="number" min="0" name="minimumStock" value="0" /></label><label class="part-full">Spesifikasi<input name="specification" placeholder="Detail ukuran atau spesifikasi teknis" /></label><label class="part-full">Compatible model<input name="compatibleModels" placeholder="Contoh: RG 125 / 150 kVA" /></label></div><div class="modal-actions"><button type="button" class="secondary-button" id="cancelPartModal">Batal</button><button class="primary-button" type="submit">Simpan spare part</button></div></form></div>';
+document.body.append(partModal);
+const closePartModal = () => partModal.classList.remove('open');
+$('#addPartButton').addEventListener('click', () => partModal.classList.add('open'));
+$('#closePartModal').addEventListener('click', closePartModal);
+$('#cancelPartModal').addEventListener('click', closePartModal);
+partModal.addEventListener('click', (event) => { if (event.target === partModal) closePartModal(); });
+const filterParts = () => {
+  const query = $('#partSearch').value.toLowerCase();
+  const stock = $('#partStockFilter').value;
+  let visible = 0;
+  $$('#partRows tr').forEach((row) => { const match = row.textContent.toLowerCase().includes(query) && (stock === 'all' || row.dataset.stock === stock); row.hidden = !match; if (match) visible += 1; });
+  $('#partCount').textContent = `${visible} dari 248`;
+};
+$('#partSearch').addEventListener('input', filterParts);
+$('#partStockFilter').addEventListener('change', filterParts);
+$('#partForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = new FormData(event.target);
+  if (window.crmDb?.ready) {
+    const result = await window.crmDb.createSparePart({ part_code: form.get('partCode'), name: form.get('name'), brand: form.get('brand') || null, category: form.get('category') || null, unit: form.get('unit'), minimum_stock: Number(form.get('minimumStock')), specification: form.get('specification') || null, compatible_models: form.get('compatibleModels') || null });
+    if (result.error) { window.alert(`Spare part belum tersimpan: ${result.error.message}`); return; }
+  }
+  const row = document.createElement('tr');
+  row.dataset.stock = 'safe';
+  row.innerHTML = `<td><span class="part-code">${form.get('partCode')}</span></td><td><b>${form.get('name')}</b><small>${form.get('unit')}</small></td><td>${form.get('category') || '-'}</td><td>${form.get('compatibleModels') || '-'}</td><td><strong>0 ${form.get('unit')}</strong></td><td>${form.get('minimumStock')} ${form.get('unit')}</td><td>Belum diatur</td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td>`;
+  $('#partRows').prepend(row);
+  $('#partCount').textContent = `${$('#partRows tr').length} dari 248`;
+  event.target.reset();
+  closePartModal();
+});
+
+const quotationModal = document.createElement('div');
+quotationModal.className = 'modal-backdrop';
+quotationModal.innerHTML = '<div class="modal inventory-modal"><div class="modal-header"><div><p class="eyebrow">QUOTATION</p><h2>Buat penawaran</h2></div><button class="icon-button" id="closeQuotationModal"><svg><use href="#i-close"/></svg></button></div><form id="quotationForm"><label>Customer<select required name="customer" id="quotationCustomerSelect"></select></label><label>Deskripsi penawaran<input required name="description" placeholder="Spare part dan jasa maintenance" /></label><div class="quotation-form-grid"><label>Jumlah<input required type="number" min="1" name="quantity" value="1" /></label><label>Harga satuan<input required type="number" min="0" name="unitPrice" placeholder="Rp" /></label><label>Berlaku sampai<input type="date" name="validUntil" /></label></div><div class="modal-actions"><button type="button" class="secondary-button" id="cancelQuotationModal">Batal</button><button class="primary-button" type="submit">Simpan penawaran</button></div></form></div>';
+document.body.append(quotationModal);
+const closeQuotationModal = () => quotationModal.classList.remove('open');
+$('#createQuotationButton').addEventListener('click', () => { $('#quotationCustomerSelect').innerHTML = $$('#customerRows tr').map((row) => `<option value="${row.dataset.customerId}">${row.querySelector('.person b')?.textContent || 'Customer'}</option>`).join(''); quotationModal.classList.add('open'); });
+$('#closeQuotationModal').addEventListener('click', closeQuotationModal);
+$('#cancelQuotationModal').addEventListener('click', closeQuotationModal);
+quotationModal.addEventListener('click', (event) => { if (event.target === quotationModal) closeQuotationModal(); });
+$('#quotationForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = new FormData(event.target);
+  if (window.crmDb?.ready && String(form.get('customer')).startsWith('demo-')) { window.alert('Customer demo belum memiliki ID database.'); return; }
+  if (window.crmDb?.ready) {
+    const quote = await window.crmDb.createQuotation({ customer_id: form.get('customer'), status: 'draft', valid_until: form.get('validUntil') || null });
+    if (quote.error) { window.alert(`Penawaran belum tersimpan: ${quote.error.message}`); return; }
+    const item = await window.crmDb.createQuotationItem({ quotation_id: quote.data.id, description: form.get('description'), quantity: Number(form.get('quantity')), unit_price: Number(form.get('unitPrice')) });
+    if (item.error) { window.alert(`Penawaran dibuat, tetapi item belum tersimpan: ${item.error.message}`); return; }
+  }
+  event.target.reset();
+  closeQuotationModal();
 });
