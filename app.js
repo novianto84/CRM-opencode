@@ -109,12 +109,14 @@ $$('.nav-item').forEach((item) => item.addEventListener('click', () => {
     const isEmployee = module === 'Karyawan';
     const isCustomer = module === 'Customer';
     const isMaintenance = module === 'Maintenance';
-    $('#overviewView').hidden = isCompany || isAsset || isEmployee || isCustomer || isMaintenance;
+    const isWorkOrder = module === 'SPK';
+    $('#overviewView').hidden = isCompany || isAsset || isEmployee || isCustomer || isMaintenance || isWorkOrder;
     $('#companyView').hidden = !isCompany;
     $('#assetView').hidden = !isAsset;
     $('#employeeView').hidden = !isEmployee;
     $('#customerView').hidden = !isCustomer;
     $('#maintenanceView').hidden = !isMaintenance;
+    $('#workOrderView').hidden = !isWorkOrder;
   }
   $('#sidebar').classList.remove('open');
 }));
@@ -459,8 +461,9 @@ const renderDbMaintenanceRows = (schedules) => schedules.map((schedule) => {
   const type = schedule.maintenance_type.charAt(0).toUpperCase() + schedule.maintenance_type.slice(1);
   return `<tr data-maintenance-status="planned"><td><div class="schedule-name"><span class="schedule-icon schedule-blue">◷</span><div><b>${schedule.title}</b><small>${schedule.id.slice(0, 8).toUpperCase()}</small></div></div></td><td>${schedule.assets?.name || '-'}<br><small>${schedule.assets?.generator_serial || schedule.assets?.asset_code || '-'}</small></td><td>${schedule.assets?.customers?.name || '-'}</td><td>${type}</td><td>${dueDate}</td><td>Belum ditugaskan</td><td><span class="status status-blue">Terjadwal</span></td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`;
 }).join('');
+const renderDbWorkOrderRows = (orders) => orders.map((order) => `<tr data-workorder-status="${order.status}"><td><span class="workorder-code">${order.work_order_code}</span></td><td><b>${order.customers?.name || '-'}</b><small>${order.assets?.name || 'Belum ada aset'}</small></td><td>${order.title}</td><td>Belum ditugaskan</td><td>${order.scheduled_at ? new Date(order.scheduled_at).toLocaleDateString('id-ID') : 'Belum dijadwalkan'}</td><td><span class="status status-blue">${order.status.replaceAll('_', ' ')}</span></td><td>${new Date(order.updated_at).toLocaleDateString('id-ID')}</td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`).join('');
 async function loadDatabaseData() {
-  const [customerResult, assetResult, scheduleResult] = await Promise.all([window.crmDb.getCustomers(), window.crmDb.getAssets(), window.crmDb.getMaintenanceSchedules()]);
+  const [customerResult, assetResult, scheduleResult, workOrderResult] = await Promise.all([window.crmDb.getCustomers(), window.crmDb.getAssets(), window.crmDb.getMaintenanceSchedules(), window.crmDb.getWorkOrders()]);
   if (!customerResult.error && customerResult.data?.length) {
     $('#customerRows').innerHTML = renderDbCustomerRows(customerResult.data);
     $$('#customerRows .more-button').forEach((button) => button.addEventListener('click', () => openCustomerDetail(button.closest('tr'))));
@@ -472,6 +475,10 @@ async function loadDatabaseData() {
   if (!scheduleResult.error && scheduleResult.data?.length) {
     $('#maintenanceRows').innerHTML = renderDbMaintenanceRows(scheduleResult.data);
     $('#maintenanceCount').textContent = `${scheduleResult.data.length} dari ${scheduleResult.data.length}`;
+  }
+  if (!workOrderResult.error && workOrderResult.data?.length) {
+    $('#workOrderRows').innerHTML = renderDbWorkOrderRows(workOrderResult.data);
+    $('#workOrderCount').textContent = `${workOrderResult.data.length} dari ${workOrderResult.data.length}`;
   }
 }
 setupAuth();
@@ -513,4 +520,48 @@ $('#maintenanceForm').addEventListener('submit', async (event) => {
   $('#maintenanceCount').textContent = `${$('#maintenanceRows tr').length} dari 18`;
   event.target.reset();
   closeMaintenanceModal();
+});
+
+const workOrderModal = document.createElement('div');
+workOrderModal.className = 'modal-backdrop';
+workOrderModal.innerHTML = '<div class="modal workorder-modal"><div class="modal-header"><div><p class="eyebrow">SERVICE ORDER</p><h2>Buat SPK baru</h2></div><button class="icon-button" id="closeWorkOrderModal"><svg><use href="#i-close"/></svg></button></div><form id="workOrderForm"><label>Customer<select required name="customer" id="workOrderCustomerSelect"></select></label><label>Aset genset<select name="asset" id="workOrderAssetSelect"></select></label><label>Judul pekerjaan<input required name="title" placeholder="Contoh: Servis berkala genset" /></label><label>Deskripsi pekerjaan<textarea name="description" rows="3" placeholder="Keluhan, scope pekerjaan, atau catatan teknisi"></textarea></label><div class="workorder-form-grid"><label>Jadwal pekerjaan<input required type="datetime-local" name="scheduledAt" /></label><label>Prioritas<select name="priority"><option>Normal</option><option>Urgent</option><option>Critical</option></select></label></div><div class="modal-actions"><button type="button" class="secondary-button" id="cancelWorkOrderModal">Batal</button><button class="primary-button" type="submit">Simpan SPK</button></div></form></div>';
+document.body.append(workOrderModal);
+const closeWorkOrderModal = () => workOrderModal.classList.remove('open');
+const refreshWorkOrderOptions = () => {
+  $('#workOrderCustomerSelect').innerHTML = $$('#customerRows tr').map((row) => `<option value="${row.dataset.customerId}">${row.querySelector('.person b')?.textContent || 'Customer'}</option>`).join('');
+  $('#workOrderAssetSelect').innerHTML = '<option value="">Tanpa aset spesifik</option>' + $$('#assetRows tr').map((row) => `<option value="${row.dataset.assetDbId || ''}" data-code="${row.dataset.assetId}">${row.querySelector('.asset-name b')?.textContent || 'Aset'}</option>`).join('');
+};
+$('#addWorkOrderButton').addEventListener('click', () => { refreshWorkOrderOptions(); workOrderModal.classList.add('open'); });
+$('#closeWorkOrderModal').addEventListener('click', closeWorkOrderModal);
+$('#cancelWorkOrderModal').addEventListener('click', closeWorkOrderModal);
+workOrderModal.addEventListener('click', (event) => { if (event.target === workOrderModal) closeWorkOrderModal(); });
+const filterWorkOrders = () => {
+  const query = $('#workOrderSearch').value.toLowerCase();
+  const status = $('#workOrderStatusFilter').value;
+  let visible = 0;
+  $$('#workOrderRows tr').forEach((row) => { const match = row.textContent.toLowerCase().includes(query) && (status === 'all' || row.dataset.workorderStatus === status); row.hidden = !match; if (match) visible += 1; });
+  $('#workOrderCount').textContent = `${visible} dari 14`;
+};
+$('#workOrderSearch').addEventListener('input', filterWorkOrders);
+$('#workOrderStatusFilter').addEventListener('change', filterWorkOrders);
+$('#workOrderForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = new FormData(event.target);
+  const customerId = form.get('customer');
+  const assetId = form.get('asset') || null;
+  if (window.crmDb?.ready && (!customerId || customerId.startsWith('demo-'))) { window.alert('Customer belum memiliki ID database. Simpan customer terlebih dahulu.'); return; }
+  if (window.crmDb?.ready && assetId && !assetId.match(/^[0-9a-f-]{36}$/i)) { window.alert('Aset yang dipilih belum memiliki ID database.'); return; }
+  if (window.crmDb?.ready) {
+    const result = await window.crmDb.createWorkOrder({ customer_id: customerId, asset_id: assetId || null, title: form.get('title'), description: form.get('description') || null, status: 'open', scheduled_at: form.get('scheduledAt') ? new Date(form.get('scheduledAt')).toISOString() : null });
+    if (result.error) { window.alert(`SPK belum tersimpan: ${result.error.message}`); return; }
+  }
+  const customerName = $('#workOrderCustomerSelect').options[$('#workOrderCustomerSelect').selectedIndex]?.textContent || 'Customer';
+  const assetName = $('#workOrderAssetSelect').options[$('#workOrderAssetSelect').selectedIndex]?.textContent || 'Tanpa aset spesifik';
+  const row = document.createElement('tr');
+  row.dataset.workorderStatus = 'open';
+  row.innerHTML = `<td><span class="workorder-code">SPK-NEW-${Date.now().toString().slice(-4)}</span></td><td><b>${customerName}</b><small>${assetName}</small></td><td>${form.get('title')}</td><td>Belum ditugaskan</td><td>${new Date(form.get('scheduledAt')).toLocaleDateString('id-ID')}</td><td><span class="status status-blue">Open</span></td><td>Baru saja</td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td>`;
+  $('#workOrderRows').prepend(row);
+  $('#workOrderCount').textContent = `${$('#workOrderRows tr').length} dari 14`;
+  event.target.reset();
+  closeWorkOrderModal();
 });
