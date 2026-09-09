@@ -69,6 +69,10 @@
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('maintenance_records').insert(payload).select().single();
     },
+    async createMaintenancePart(payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('maintenance_parts').insert(payload).select().single();
+    },
     async getSpareParts() {
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('spare_part_inventory').select('*').order('part_code');
