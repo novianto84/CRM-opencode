@@ -86,14 +86,14 @@ const renderDbContactRows = (relations) => {
   relations.forEach((rel) => {
     const contact = rel.contacts || {};
     const key = contact.id || rel.id;
-    if (!grouped.has(key)) grouped.set(key, { contact, fallback: rel, customers: [], roles: [], primary: false });
+    if (!grouped.has(key)) grouped.set(key, { key, contact, fallback: rel, customers: [], roles: [], primary: false });
     const entry = grouped.get(key);
     if (rel.customers?.name) entry.customers.push(rel.customers.name);
     if (rel.role || rel.position || contact.position) entry.roles.push(rel.role || rel.position || contact.position);
     if (rel.is_primary) entry.primary = true;
   });
   const uniq = (arr) => [...new Set(arr)];
-  return [...grouped.values()].map(({ contact, fallback, customers, roles, primary }) => {
+  return [...grouped.values()].map(({ key, contact, fallback, customers, roles, primary }) => {
     const name = contact.full_name || fallback.full_name || '-';
     const initials = name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
     const email = contact.email || fallback.email || '';
