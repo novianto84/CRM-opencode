@@ -733,12 +733,22 @@ document.body.append(authGate);
 const setAuthMessage = (message, error = false) => { $('#authMessage').textContent = message; $('#authMessage').className = `auth-message${error ? ' error' : ''}`; };
 const hideAuthGate = () => authGate.classList.add('hidden');
 const showAuthGate = () => authGate.classList.remove('hidden');
+let authBusy = false;
+let lastEnterAt = 0;
+async function enterWorkspace(force = false) {
+  const now = Date.now();
+  if (authBusy || (!force && now - lastEnterAt < 8000)) return;
+  authBusy = true;
+  lastEnterAt = now;
+  try { hideAuthGate(); await loadAccessLevel(); await loadDatabaseData(); }
+  finally { authBusy = false; }
+}
 const setupAuth = async () => {
   if (!window.crmDb?.ready) { hideAuthGate(); return; }
   const { data } = await window.supabaseClient.auth.getSession();
-  if (data.session) { hideAuthGate(); await loadAccessLevel(); await loadDatabaseData(); return; }
+  if (data.session) { await enterWorkspace(true); return; }
   showAuthGate();
-  window.supabaseClient.auth.onAuthStateChange(async (_event, session) => { if (session) { hideAuthGate(); await loadAccessLevel(); await loadDatabaseData(); } else showAuthGate(); });
+  window.supabaseClient.auth.onAuthStateChange(async (_event, session) => { if (session) { await enterWorkspace(false); } else if (!authBusy) showAuthGate(); });
 };
 $('#authForm').addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -748,7 +758,9 @@ $('#authForm').addEventListener('submit', async (event) => {
   setAuthMessage('Memproses login...');
   const { error } = await window.supabaseClient.auth.signInWithPassword({ email: form.get('email'), password: form.get('password') });
   button.disabled = false;
-  if (error) setAuthMessage(error.message, true);
+  if (error) { setAuthMessage(error.message, true); return; }
+  setAuthMessage('Berhasil masuk, memuat data...');
+  await enterWorkspace(true);
 });
 $('#authSignup').addEventListener('click', async () => {
   const form = new FormData($('#authForm'));
@@ -767,7 +779,7 @@ $('#authSignup').addEventListener('click', async () => {
     setAuthMessage(message, true);
     return;
   }
-  if (data.session) { hideAuthGate(); await loadDatabaseData(); return; }
+  if (data.session) { await enterWorkspace(true); return; }
   setAuthMessage('Akun berhasil dibuat. Buka email konfirmasi dari Supabase, lalu masuk kembali. Periksa folder Spam bila belum terlihat.');
 });
 const renderDbCustomerRows = (customers) => customers.map((customer) => {
