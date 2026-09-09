@@ -480,6 +480,14 @@ const renderDbEmployeeRows = (employees) => employees.map((employee) => {
 }).join('');
 let quotationCache = [];
 const formatRupiah = (value) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
+const showDatabaseWarning = (errors) => {
+  if (!errors.length || $('#databaseWarning')) return;
+  const warning = document.createElement('div');
+  warning.id = 'databaseWarning';
+  warning.className = 'database-warning';
+  warning.textContent = 'Sebagian data database belum dapat dimuat. Data yang tersimpan tidak dihapus.';
+  document.body.append(warning);
+};
 const renderQuotations = (quotations) => quotations.slice(0, 5).map((quote) => `<div><span class="quotation-code">${quote.quotation_code}</span><div><b>${quote.customers?.name || 'Customer'}</b><small>${quote.quotation_items?.map((item) => `${item.description} x ${item.quantity}`).join(' · ') || 'Belum ada item'}</small></div><strong>${formatRupiah(quote.total)}</strong><span class="status status-${quote.status === 'approved' ? 'green' : quote.status === 'sent' ? 'yellow' : 'gray'}">${quote.status}</span><button class="more-button print-quotation" data-quotation-id="${quote.id}" title="Cetak"><svg><use href="#i-more"/></svg></button></div>`).join('');
 const printQuotation = (quote) => {
   const items = quote.quotation_items || [];
@@ -518,6 +526,18 @@ async function loadDatabaseData() {
   if (!quotationResult.error && quotationResult.data?.length) {
     quotationCache = quotationResult.data;
     $('#quotationList').innerHTML = renderQuotations(quotationCache);
+  }
+  const databaseErrors = [customerResult, assetResult, scheduleResult, workOrderResult, partsResult, employeeResult, quotationResult].filter((result) => result.error);
+  showDatabaseWarning(databaseErrors);
+  if (!customerResult.error && customerResult.data) {
+    const activeCustomers = customerResult.data.filter((customer) => customer.status === 'active').length;
+    const customerMetric = document.querySelector('.metric-grid .metric-card:nth-child(2) h2');
+    if (customerMetric) customerMetric.textContent = activeCustomers.toLocaleString('id-ID');
+  }
+  if (!assetResult.error && assetResult.data) {
+    const activeAssets = assetResult.data.filter((asset) => asset.status === 'active').length;
+    const assetMetric = document.querySelector('.metric-grid .metric-card:nth-child(3) h2');
+    if (assetMetric) assetMetric.innerHTML = `${activeAssets} <small class="unit-total">/ ${assetResult.data.length} unit</small>`;
   }
 }
 setupAuth();

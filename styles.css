@@ -45,3 +45,5 @@
 @media(max-width:560px){.report-part-field{grid-template-columns:1fr}}
  .stock-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:15px}.stock-form-grid label{display:block;color:#667387;font-size:11px;font-weight:600}.stock-form-grid input,.stock-form-grid select{display:block;width:100%;margin-top:7px;border:1px solid #dde3ec;border-radius:7px;padding:10px 11px;outline-color:var(--blue);font-size:12px;background:#fff}
 @media(max-width:560px){.stock-form-grid{grid-template-columns:1fr}.inventory-intro-actions{flex-wrap:wrap}}
+:root{--database-warning:#fff3cd}
+.database-warning{position:fixed;z-index:1000;top:14px;left:50%;transform:translateX(-50%);padding:10px 16px;border:1px solid #f0d486;border-radius:8px;background:var(--database-warning);color:#765b16;font-size:12px;box-shadow:0 8px 22px rgba(28,36,52,.12)}
