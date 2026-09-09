@@ -17,6 +17,14 @@
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('customers').select('id, name').eq('name', name).maybeSingle();
     },
+    async getCustomer(id) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('customers').select('*').eq('id', id).single();
+    },
+    async updateCustomer(id, payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('customers').update(payload).eq('id', id).select().single();
+    },
     async getCustomerContacts(customerId) {
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('customer_contacts').select('*').eq('customer_id', customerId).eq('is_active', true).order('is_primary', { ascending: false });

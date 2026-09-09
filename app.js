@@ -297,7 +297,8 @@ const customerStatusField = document.createElement('label');
 customerStatusField.innerHTML = 'Status customer<select required name="status"><option value="Prospect">Prospect</option><option value="Active" selected>Active</option><option value="Inactive">Inactive</option><option value="Suspended">Suspended</option><option value="Archived">Archived</option></select>';
 $('#customerForm .customer-form-grid').append(customerStatusField);
 const closeCustomerModal = () => customerModal.classList.remove('open');
-$('#addCustomerButton').addEventListener('click', () => customerModal.classList.add('open'));
+let editingCustomerId = null;
+$('#addCustomerButton').addEventListener('click', () => { editingCustomerId = null; $('#customerForm').reset(); customerModal.querySelector('h2').textContent = 'Tambah customer'; customerModal.classList.add('open'); });
 $('#closeCustomerModal').addEventListener('click', closeCustomerModal);
 $('#cancelCustomerModal').addEventListener('click', closeCustomerModal);
 customerModal.addEventListener('click', (event) => { if (event.target === customerModal) closeCustomerModal(); });
@@ -319,17 +320,18 @@ $('#customerForm').addEventListener('submit', async (event) => {
   const form = new FormData(event.target);
   let savedCustomer = null;
   if (window.crmDb?.ready) {
-    const result = await window.crmDb.createCustomer({
+    const payload = {
       customer_type: null,
       name: form.get('name'),
       status: form.get('status').toLowerCase(),
       phone: form.get('phone'),
       email: form.get('email') || null,
       address: form.get('address') || null
-    });
+    };
+    const result = editingCustomerId ? await window.crmDb.updateCustomer(editingCustomerId, payload) : await window.crmDb.createCustomer(payload);
     if (result.error) { window.alert(`Customer belum tersimpan: ${result.error.message}`); return; }
     savedCustomer = result.data;
-    if (form.get('contact')) {
+    if (!editingCustomerId && form.get('contact')) {
       const contact = await window.crmDb.createContact({ full_name: form.get('contact'), phone: form.get('phone') || null, email: form.get('email') || null });
       if (contact.error) { window.alert(`Customer tersimpan, tetapi PIC belum tersimpan: ${contact.error.message}`); }
       else {
@@ -345,8 +347,13 @@ $('#customerForm').addEventListener('submit', async (event) => {
   row.dataset.type = 'all';
   row.dataset.customerId = savedCustomer?.id || customerId;
   row.innerHTML = `<td><div class="person"><div class="avatar avatar-purple">${initials}</div><div><b>${name}</b><small>${customerId} · ${form.get('address') || 'Belum ada alamat'}</small></div></div></td><td><span class="customer-type">Customer</span></td><td>${form.get('contact') || 'Belum ada PIC'}<br><small>${form.get('phone') || '-'}</small></td><td><b>0 unit</b></td><td>Belum dijadwalkan<br><small>Belum ada aset</small></td><td><span class="status ${form.get('status') === 'Active' ? 'status-green' : 'status-yellow'}">${form.get('status')}</span></td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td>`;
-  $('#customerRows').prepend(row);
-  row.querySelector('.more-button').addEventListener('click', () => openCustomerDetail(row));
+  if (editingCustomerId) {
+    const currentRow = [...$$('#customerRows tr')].find((candidate) => candidate.dataset.customerId === editingCustomerId);
+    if (currentRow) { currentRow.outerHTML = row.outerHTML; const updatedRow = [...$$('#customerRows tr')].find((candidate) => candidate.dataset.customerId === editingCustomerId); updatedRow?.querySelector('.more-button').addEventListener('click', () => openCustomerDetail(updatedRow)); }
+  } else {
+    $('#customerRows').prepend(row);
+    row.querySelector('.more-button').addEventListener('click', () => openCustomerDetail(row));
+  }
   event.target.reset();
   closeCustomerModal();
 });
@@ -389,7 +396,22 @@ const openCustomerDetail = async (row) => {
 };
 $$('#customerRows tr').forEach((row, index) => { row.dataset.customerId = row.dataset.customerId || `demo-${index + 1}`; });
 $$('#customerRows .more-button').forEach((button) => button.addEventListener('click', () => openCustomerDetail(button.closest('tr'))));
-$('#customerDetailEdit').addEventListener('click', () => { closeCustomerDetail(); customerModal.classList.add('open'); });
+$('#customerDetailEdit').addEventListener('click', async () => {
+  if (!activeCustomerRow?.dataset.customerId || activeCustomerRow.dataset.customerId.startsWith('demo-')) { window.alert('Customer demo belum dapat diedit.'); return; }
+  const [customerResult, contactsResult] = await Promise.all([window.crmDb.getCustomer(activeCustomerRow.dataset.customerId), window.crmDb.getCustomerContacts(activeCustomerRow.dataset.customerId)]);
+  if (customerResult.error) { window.alert(`Detail customer belum dapat dimuat: ${customerResult.error.message}`); return; }
+  const customer = customerResult.data;
+  const contact = contactsResult.data?.[0];
+  editingCustomerId = customer.id;
+  $('#customerForm input[name="name"]').value = customer.name || '';
+  $('#customerForm input[name="contact"]').value = contact?.full_name || '';
+  $('#customerForm input[name="phone"]').value = customer.phone || contact?.phone || '';
+  $('#customerForm input[name="email"]').value = customer.email || contact?.email || '';
+  $('#customerForm input[name="address"]').value = customer.address || '';
+  $('#customerForm select[name="status"]').value = customer.status ? customer.status.charAt(0).toUpperCase() + customer.status.slice(1) : 'Active';
+  customerModal.querySelector('h2').textContent = 'Edit customer';
+  closeCustomerDetail(); customerModal.classList.add('open');
+});
 const detailActionButtons = customerDetailModal.querySelectorAll('.detail-section-heading .text-button');
 detailActionButtons[1].id = 'managePicButton';
 customerDetailModal.querySelector('.customer-address').id = 'customerLocationSummary';
