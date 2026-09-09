@@ -278,13 +278,26 @@ const filterCustomers = () => {
 };
 $('#customerSearch').addEventListener('input', filterCustomers);
 $('#customerTypeFilter').addEventListener('change', filterCustomers);
-$('#customerForm').addEventListener('submit', (event) => {
+$('#customerForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = new FormData(event.target);
+  let savedCustomer = null;
+  if (window.crmDb?.ready) {
+    const result = await window.crmDb.createCustomer({
+      customer_type: form.get('type'),
+      name: form.get('name'),
+      status: form.get('status').toLowerCase(),
+      phone: form.get('phone'),
+      email: form.get('email') || null,
+      address: form.get('address') || null
+    });
+    if (result.error) { window.alert(`Customer belum tersimpan: ${result.error.message}`); return; }
+    savedCustomer = result.data;
+  }
   const name = form.get('name');
   const initials = name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
   const isCompany = form.get('type') === 'company';
-  const customerId = `CST-${new Date().getFullYear()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+  const customerId = savedCustomer?.customer_code || `CST-${new Date().getFullYear()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
   const row = document.createElement('tr');
   row.dataset.type = form.get('type');
   row.dataset.customerId = customerId;
@@ -320,3 +333,35 @@ const openCustomerDetail = (row) => {
 };
 $$('#customerRows .more-button').forEach((button) => button.addEventListener('click', () => openCustomerDetail(button.closest('tr'))));
 $('#customerDetailEdit').addEventListener('click', () => { closeCustomerDetail(); customerModal.classList.add('open'); });
+
+const authGate = document.createElement('div');
+authGate.className = 'auth-gate';
+authGate.innerHTML = '<div class="auth-card"><div class="brand auth-brand"><span class="brand-mark">r</span><span>ruang<span class="brand-accent">crm</span></span></div><p class="eyebrow">WORKSPACE SECURE</p><h1>Masuk ke RuangCRM</h1><p class="auth-copy">Gunakan akun internal untuk mengakses data customer, aset, dan histori maintenance.</p><form id="authForm"><label>Email kerja<input required type="email" name="email" placeholder="nama@perusahaan.com" /></label><label>Password<input required type="password" name="password" minlength="6" placeholder="Minimal 6 karakter" /></label><button class="primary-button auth-submit" type="submit">Masuk</button><button class="secondary-button auth-signup" type="button" id="authSignup">Buat akun baru</button><p class="auth-message" id="authMessage"></p></form></div>';
+document.body.append(authGate);
+const setAuthMessage = (message, error = false) => { $('#authMessage').textContent = message; $('#authMessage').className = `auth-message${error ? ' error' : ''}`; };
+const hideAuthGate = () => authGate.classList.add('hidden');
+const showAuthGate = () => authGate.classList.remove('hidden');
+const setupAuth = async () => {
+  if (!window.crmDb?.ready) { hideAuthGate(); return; }
+  const { data } = await window.supabaseClient.auth.getSession();
+  if (data.session) { hideAuthGate(); return; }
+  showAuthGate();
+  window.supabaseClient.auth.onAuthStateChange((_event, session) => { if (session) hideAuthGate(); else showAuthGate(); });
+};
+$('#authForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = new FormData(event.target);
+  const button = event.target.querySelector('.auth-submit');
+  button.disabled = true;
+  setAuthMessage('Memproses login...');
+  const { error } = await window.supabaseClient.auth.signInWithPassword({ email: form.get('email'), password: form.get('password') });
+  button.disabled = false;
+  if (error) setAuthMessage(error.message, true);
+});
+$('#authSignup').addEventListener('click', async () => {
+  const form = new FormData($('#authForm'));
+  if (!form.get('email') || !form.get('password')) { setAuthMessage('Isi email dan password terlebih dahulu.', true); return; }
+  const { error } = await window.supabaseClient.auth.signUp({ email: form.get('email'), password: form.get('password') });
+  setAuthMessage(error ? error.message : 'Akun dibuat. Periksa email untuk konfirmasi login.');
+});
+setupAuth();

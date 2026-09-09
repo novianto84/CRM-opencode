@@ -8,6 +8,3 @@ Thumbs.db
 
 # Local server logs
 *.log
-
-# Supabase browser configuration (contains project-specific values)
-supabase-config.js
