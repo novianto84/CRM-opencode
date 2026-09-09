@@ -453,9 +453,22 @@ $('#authForm').addEventListener('submit', async (event) => {
 });
 $('#authSignup').addEventListener('click', async () => {
   const form = new FormData($('#authForm'));
-  if (!form.get('email') || !form.get('password')) { setAuthMessage('Isi email dan password terlebih dahulu.', true); return; }
-  const { error } = await window.supabaseClient.auth.signUp({ email: form.get('email'), password: form.get('password') });
-  setAuthMessage(error ? error.message : 'Akun dibuat. Periksa email untuk konfirmasi login.');
+  const email = String(form.get('email') || '').trim();
+  const password = String(form.get('password') || '');
+  const button = $('#authSignup');
+  if (!email || !password) { setAuthMessage('Isi email dan password terlebih dahulu.', true); return; }
+  if (password.length < 6) { setAuthMessage('Password minimal 6 karakter.', true); return; }
+  button.disabled = true;
+  setAuthMessage('Membuat akun...');
+  const { data, error } = await window.supabaseClient.auth.signUp({ email, password });
+  button.disabled = false;
+  if (error) {
+    const message = error.message.toLowerCase().includes('already registered') ? 'Email ini sudah terdaftar. Gunakan tombol Masuk.' : error.message;
+    setAuthMessage(message, true);
+    return;
+  }
+  if (data.session) { hideAuthGate(); await loadDatabaseData(); return; }
+  setAuthMessage('Akun berhasil dibuat. Buka email konfirmasi dari Supabase, lalu masuk kembali. Periksa folder Spam bila belum terlihat.');
 });
 const renderDbCustomerRows = (customers) => customers.map((customer) => {
   const initials = customer.name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
