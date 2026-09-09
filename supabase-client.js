@@ -45,6 +45,10 @@
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('contacts').select('id, full_name, position, phone, email').eq('is_active', true).order('full_name').limit(200);
     },
+    async getContactDirectory() {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('customer_contacts').select('id, role, position, is_primary, created_at, contacts!customer_contacts_contact_id_fkey(id, full_name, position, phone, whatsapp, email), customers(name)').eq('is_active', true).order('created_at', { ascending: false }).limit(500);
+    },
     async createContact(payload) {
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('contacts').insert(payload).select().single();

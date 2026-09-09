@@ -81,11 +81,46 @@ $('#copyCustomerLink').addEventListener('click', async () => {
   window.setTimeout(() => { $('#copyCustomerLink').textContent = 'Salin link customer'; }, 1800);
 });
 
-$('#contactForm').addEventListener('submit', (event) => {
+const renderDbContactRows = (relations) => {
+  const grouped = new Map();
+  relations.forEach((rel) => {
+    const contact = rel.contacts || {};
+    const key = contact.id || rel.id;
+    if (!grouped.has(key)) grouped.set(key, { contact, fallback: rel, customers: [], roles: [], primary: false });
+    const entry = grouped.get(key);
+    if (rel.customers?.name) entry.customers.push(rel.customers.name);
+    if (rel.role || rel.position || contact.position) entry.roles.push(rel.role || rel.position || contact.position);
+    if (rel.is_primary) entry.primary = true;
+  });
+  const uniq = (arr) => [...new Set(arr)];
+  return [...grouped.values()].map(({ contact, fallback, customers, roles, primary }) => {
+    const name = contact.full_name || fallback.full_name || '-';
+    const initials = name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
+    const email = contact.email || fallback.email || '';
+    const phone = contact.phone || contact.whatsapp || fallback.phone || '';
+    return `<tr><td><div class="person"><div class="avatar avatar-blue">${initials}</div><div><b>${name}</b><small>${email || phone || '-'}</small></div></div></td><td><span class="status ${primary ? 'status-green' : 'status-blue'}">${primary ? 'PIC Utama' : 'PIC'}</span></td><td>${uniq(customers).join(', ') || '-'}</td><td>${phone || '-'}</td><td><b>${uniq(roles).join(', ') || '-'}</b></td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`;
+  }).join('');
+};
+async function reloadContactDirectory() {
+  if (!window.crmDb?.ready) return;
+  const dir = await window.crmDb.getContactDirectory();
+  if (dir.error) { showToast(`Daftar kontak gagal dimuat: ${dir.error.message}`, true); return; }
+  if (dir.data?.length) $('#contactRows').innerHTML = renderDbContactRows(dir.data);
+}
+$('#contactForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = new FormData(event.target);
   const name = form.get('name');
   const email = form.get('email');
+  if (window.crmDb?.ready) {
+    const result = await window.crmDb.createContact({ full_name: name, email: email || null, notes: `Status awal: ${form.get('status')}` });
+    if (result.error) { showToast(`Kontak belum tersimpan: ${result.error.message}`, true); return; }
+    event.target.reset();
+    closeModal();
+    showToast('Kontak berhasil disimpan ke database.');
+    await reloadContactDirectory();
+    return;
+  }
   const initials = name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
   const row = document.createElement('tr');
   row.innerHTML = `<td><div class="person"><div class="avatar avatar-purple">${initials}</div><div><b>${name}</b><small>${email}</small></div></div></td><td><span class="status status-blue">${form.get('status')}</span></td><td>Belum ada unit</td><td>Hari ini</td><td><b>Rp 0</b></td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td>`;
@@ -743,7 +778,7 @@ const printQuotation = (quote) => {
   printWindow.document.close(); printWindow.focus(); printWindow.print();
 };
 async function loadDatabaseData() {
-  const [customerResult, assetResult, scheduleResult, workOrderResult, partsResult, employeeResult, quotationResult] = await Promise.all([window.crmDb.getCustomers(), window.crmDb.getAssets(), window.crmDb.getMaintenanceSchedules(), window.crmDb.getWorkOrders(), window.crmDb.getSpareParts(), isAdmin() ? window.crmDb.getEmployees() : window.crmDb.getEmployeesPublic(), window.crmDb.getQuotations()]);
+  const [customerResult, assetResult, scheduleResult, workOrderResult, partsResult, employeeResult, quotationResult, directoryResult] = await Promise.all([window.crmDb.getCustomers(), window.crmDb.getAssets(), window.crmDb.getMaintenanceSchedules(), window.crmDb.getWorkOrders(), window.crmDb.getSpareParts(), isAdmin() ? window.crmDb.getEmployees() : window.crmDb.getEmployeesPublic(), window.crmDb.getQuotations(), window.crmDb.getContactDirectory()]);
   if (!customerResult.error && customerResult.data?.length) {
     $('#customerRows').innerHTML = renderDbCustomerRows(customerResult.data);
     $$('#customerRows .more-button').forEach((button) => button.addEventListener('click', () => openCustomerDetail(button.closest('tr'))));
@@ -774,7 +809,10 @@ async function loadDatabaseData() {
     quotationCache = quotationResult.data;
     $('#quotationList').innerHTML = renderQuotations(quotationCache);
   }
-  const databaseErrors = [customerResult, assetResult, scheduleResult, workOrderResult, partsResult, employeeResult, quotationResult].filter((result) => result.error);
+  if (!directoryResult.error && directoryResult.data?.length) {
+    $('#contactRows').innerHTML = renderDbContactRows(directoryResult.data);
+  }
+  const databaseErrors = [customerResult, assetResult, scheduleResult, workOrderResult, partsResult, employeeResult, quotationResult, directoryResult].filter((result) => result.error);
   showDatabaseWarning(databaseErrors);
   if (!customerResult.error && customerResult.data) {
     const activeCustomers = customerResult.data.filter((customer) => customer.status === 'active').length;
