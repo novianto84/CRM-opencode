@@ -1,8 +1,15 @@
 -- Spare parts, stock movements, usage history, and quotations.
 -- Run after supabase/schema.sql.
 
-create type public.inventory_movement_type as enum ('inbound', 'outbound', 'adjustment');
-create type public.quotation_status as enum ('draft', 'sent', 'approved', 'rejected', 'expired');
+do $$ begin
+  create type public.inventory_movement_type as enum ('inbound', 'outbound', 'adjustment');
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type public.quotation_status as enum ('draft', 'sent', 'approved', 'rejected', 'expired');
+exception when duplicate_object then null;
+end $$;
 
 alter table public.spare_parts
   add column if not exists brand text,
@@ -13,7 +20,7 @@ alter table public.spare_parts
   add column if not exists barcode text unique,
   add column if not exists is_serialized boolean not null default false;
 
-create table public.warehouses (
+create table if not exists public.warehouses (
   id uuid primary key default gen_random_uuid(),
   code text not null unique,
   name text not null,
@@ -23,7 +30,7 @@ create table public.warehouses (
   updated_at timestamptz not null default now()
 );
 
-create table public.inventory_movements (
+create table if not exists public.inventory_movements (
   id uuid primary key default gen_random_uuid(),
   spare_part_id uuid not null references public.spare_parts(id) on delete restrict,
   warehouse_id uuid not null references public.warehouses(id) on delete restrict,
@@ -61,6 +68,7 @@ $$;
 
 drop trigger if exists maintenance_parts_record_usage on public.maintenance_parts;
 create trigger maintenance_parts_record_usage
+after insert on public.maintenance_parts
 for each row execute function public.record_maintenance_part_usage();
 
 create or replace view public.spare_part_inventory as
@@ -76,7 +84,7 @@ from public.spare_parts sp
 left join public.inventory_movements im on im.spare_part_id = sp.id
 group by sp.id;
 
-create table public.quotations (
+create table if not exists public.quotations (
   id uuid primary key default gen_random_uuid(),
   quotation_code text not null unique default ('QUO-' || to_char(current_date, 'YYYY') || '-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 6))),
   customer_id uuid not null references public.customers(id) on delete restrict,
@@ -93,7 +101,7 @@ create table public.quotations (
   updated_at timestamptz not null default now()
 );
 
-create table public.quotation_items (
+create table if not exists public.quotation_items (
   id uuid primary key default gen_random_uuid(),
   quotation_id uuid not null references public.quotations(id) on delete cascade,
   spare_part_id uuid references public.spare_parts(id) on delete set null,
