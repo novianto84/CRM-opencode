@@ -108,11 +108,13 @@ $$('.nav-item').forEach((item) => item.addEventListener('click', () => {
     const isAsset = module === 'Asset';
     const isEmployee = module === 'Karyawan';
     const isCustomer = module === 'Customer';
-    $('#overviewView').hidden = isCompany || isAsset || isEmployee || isCustomer;
+    const isMaintenance = module === 'Maintenance';
+    $('#overviewView').hidden = isCompany || isAsset || isEmployee || isCustomer || isMaintenance;
     $('#companyView').hidden = !isCompany;
     $('#assetView').hidden = !isAsset;
     $('#employeeView').hidden = !isEmployee;
     $('#customerView').hidden = !isCustomer;
+    $('#maintenanceView').hidden = !isMaintenance;
   }
   $('#sidebar').classList.remove('open');
 }));
@@ -451,9 +453,14 @@ const renderDbCustomerRows = (customers) => customers.map((customer) => {
   const statusClass = customer.status === 'active' ? 'status-green' : 'status-yellow';
   return `<tr data-type="${customer.customer_type}" data-customer-id="${customer.id}"><td><div class="person"><div class="avatar avatar-blue">${initials}</div><div><b>${customer.name}</b><small>${customer.customer_code}</small></div></div></td><td><span class="customer-type ${customer.customer_type === 'company' ? 'type-company' : 'type-person'}">${typeLabel}</span></td><td>Belum diisi<br><small>Tambahkan PIC</small></td><td><b>${customer.asset_count || 0} unit</b></td><td>${customer.next_maintenance_date || 'Belum dijadwalkan'}</td><td><span class="status ${statusClass}">${statusLabel}</span></td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`;
 }).join('');
-const renderDbAssetRows = (assets) => assets.map((asset) => `<tr data-status="${asset.status}" data-asset-id="${asset.asset_code}" data-customer="${asset.customers?.name || ''}" data-capacity="${asset.capacity_kva || 'Belum dicatat'} kVA" data-last-updated="${new Date(asset.updated_at).toLocaleString('id-ID')}"><td><div class="asset-name"><span class="asset-thumb">G</span><div><b>${asset.name}</b><small><span class="asset-id">${asset.asset_code}</span> · ${asset.generator_serial}</small></div></div></td><td>Genset Diesel</td><td><span class="config-cell">${asset.generator_type}<br><small>${asset.operation_system}</small><br><small class="mode-label">${asset.operation_mode}</small></span></td><td>${asset.generator_serial}</td><td>${asset.customer_locations?.name || asset.customers?.name || 'Belum diisi'}</td><td><span class="status ${asset.status === 'active' ? 'status-green' : 'status-gray'}">${asset.status === 'active' ? 'Aktif' : 'Tidak aktif'}</span></td><td>Belum dicatat</td><td>Belum dijadwalkan</td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`).join('');
+const renderDbAssetRows = (assets) => assets.map((asset) => `<tr data-status="${asset.status}" data-asset-id="${asset.asset_code}" data-asset-db-id="${asset.id}" data-customer="${asset.customers?.name || ''}" data-capacity="${asset.capacity_kva || 'Belum dicatat'} kVA" data-last-updated="${new Date(asset.updated_at).toLocaleString('id-ID')}"><td><div class="asset-name"><span class="asset-thumb">G</span><div><b>${asset.name}</b><small><span class="asset-id">${asset.asset_code}</span> · ${asset.generator_serial}</small></div></div></td><td>Genset Diesel</td><td><span class="config-cell">${asset.generator_type}<br><small>${asset.operation_system}</small><br><small class="mode-label">${asset.operation_mode}</small></span></td><td>${asset.generator_serial}</td><td>${asset.customer_locations?.name || asset.customers?.name || 'Belum diisi'}</td><td><span class="status ${asset.status === 'active' ? 'status-green' : 'status-gray'}">${asset.status === 'active' ? 'Aktif' : 'Tidak aktif'}</span></td><td>Belum dicatat</td><td>Belum dijadwalkan</td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`).join('');
+const renderDbMaintenanceRows = (schedules) => schedules.map((schedule) => {
+  const dueDate = schedule.next_due_date ? new Date(`${schedule.next_due_date}T00:00:00`).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Belum dijadwalkan';
+  const type = schedule.maintenance_type.charAt(0).toUpperCase() + schedule.maintenance_type.slice(1);
+  return `<tr data-maintenance-status="planned"><td><div class="schedule-name"><span class="schedule-icon schedule-blue">◷</span><div><b>${schedule.title}</b><small>${schedule.id.slice(0, 8).toUpperCase()}</small></div></div></td><td>${schedule.assets?.name || '-'}<br><small>${schedule.assets?.generator_serial || schedule.assets?.asset_code || '-'}</small></td><td>${schedule.assets?.customers?.name || '-'}</td><td>${type}</td><td>${dueDate}</td><td>Belum ditugaskan</td><td><span class="status status-blue">Terjadwal</span></td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`;
+}).join('');
 async function loadDatabaseData() {
-  const [customerResult, assetResult] = await Promise.all([window.crmDb.getCustomers(), window.crmDb.getAssets()]);
+  const [customerResult, assetResult, scheduleResult] = await Promise.all([window.crmDb.getCustomers(), window.crmDb.getAssets(), window.crmDb.getMaintenanceSchedules()]);
   if (!customerResult.error && customerResult.data?.length) {
     $('#customerRows').innerHTML = renderDbCustomerRows(customerResult.data);
     $$('#customerRows .more-button').forEach((button) => button.addEventListener('click', () => openCustomerDetail(button.closest('tr'))));
@@ -462,5 +469,48 @@ async function loadDatabaseData() {
     $('#assetRows').innerHTML = renderDbAssetRows(assetResult.data);
     $$('#assetRows .more-button').forEach((button) => button.addEventListener('click', () => openAssetDetail(button.closest('tr'))));
   }
+  if (!scheduleResult.error && scheduleResult.data?.length) {
+    $('#maintenanceRows').innerHTML = renderDbMaintenanceRows(scheduleResult.data);
+    $('#maintenanceCount').textContent = `${scheduleResult.data.length} dari ${scheduleResult.data.length}`;
+  }
 }
 setupAuth();
+
+const maintenanceModal = document.createElement('div');
+maintenanceModal.className = 'modal-backdrop';
+maintenanceModal.innerHTML = '<div class="modal maintenance-modal"><div class="modal-header"><div><p class="eyebrow">MAINTENANCE PLAN</p><h2>Jadwalkan maintenance</h2></div><button class="icon-button" id="closeMaintenanceModal"><svg><use href="#i-close"/></svg></button></div><form id="maintenanceForm"><label>Aset genset<select required name="asset" id="maintenanceAssetSelect"></select></label><label>Judul pekerjaan<input required name="title" placeholder="Contoh: Servis berkala 1.000 jam" /></label><div class="maintenance-form-grid"><label>Jenis maintenance<select required name="type"><option value="preventive">Preventive</option><option value="corrective">Corrective</option><option value="inspection">Inspection</option></select></label><label>Jatuh tempo<input required type="date" name="dueDate" /></label><label>Jam operasi<input type="number" name="dueHours" min="0" placeholder="Contoh: 1000" /></label><label>Reminder sebelum (hari)<input required type="number" name="reminderDays" min="0" value="14" /></label></div><div class="modal-actions"><button type="button" class="secondary-button" id="cancelMaintenanceModal">Batal</button><button class="primary-button" type="submit">Simpan jadwal</button></div></form></div>';
+document.body.append(maintenanceModal);
+const closeMaintenanceModal = () => maintenanceModal.classList.remove('open');
+const refreshMaintenanceAssetOptions = () => {
+  const options = $$('#assetRows tr').map((row) => `<option value="${row.dataset.assetId}" data-db-id="${row.dataset.assetDbId || ''}">${row.querySelector('.asset-name b')?.textContent || 'Aset'} · ${row.dataset.customer || 'Customer'}</option>`);
+  $('#maintenanceAssetSelect').innerHTML = options.length ? options.join('') : '<option value="">Belum ada aset</option>';
+};
+$('#addMaintenanceButton').addEventListener('click', () => { refreshMaintenanceAssetOptions(); maintenanceModal.classList.add('open'); });
+$('#closeMaintenanceModal').addEventListener('click', closeMaintenanceModal);
+$('#cancelMaintenanceModal').addEventListener('click', closeMaintenanceModal);
+maintenanceModal.addEventListener('click', (event) => { if (event.target === maintenanceModal) closeMaintenanceModal(); });
+$('#maintenanceStatusFilter').addEventListener('change', (event) => {
+  const value = event.target.value;
+  let visible = 0;
+  $$('#maintenanceRows tr').forEach((row) => { const match = value === 'all' || row.dataset.maintenanceStatus === value; row.hidden = !match; if (match) visible += 1; });
+  $('#maintenanceCount').textContent = `${visible} dari 18`;
+});
+$('#maintenanceForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = new FormData(event.target);
+  const select = $('#maintenanceAssetSelect');
+  const selected = select.options[select.selectedIndex];
+  const assetDbId = selected?.dataset.dbId;
+  if (window.crmDb?.ready && !assetDbId) { window.alert('Aset demo belum memiliki ID database. Tambahkan aset melalui database terlebih dahulu.'); return; }
+  if (window.crmDb?.ready) {
+    const result = await window.crmDb.createMaintenanceSchedule({ asset_id: assetDbId, maintenance_type: form.get('type'), title: form.get('title'), next_due_date: form.get('dueDate'), next_due_hours: form.get('dueHours') ? Number(form.get('dueHours')) : null, reminder_days_before: Number(form.get('reminderDays')), is_active: true });
+    if (result.error) { window.alert(`Jadwal belum tersimpan: ${result.error.message}`); return; }
+  }
+  const row = document.createElement('tr');
+  row.dataset.maintenanceStatus = 'planned';
+  row.innerHTML = `<td><div class="schedule-name"><span class="schedule-icon schedule-blue">◷</span><div><b>${form.get('title')}</b><small>MS-NEW-${Date.now().toString().slice(-4)}</small></div></div></td><td>${selected.textContent.split(' · ')[0]}<br><small>${select.value}</small></td><td>${selected.textContent.split(' · ')[1] || 'Customer'}</td><td>${form.get('type')}</td><td>${new Date(`${form.get('dueDate')}T00:00:00`).toLocaleDateString('id-ID')}</td><td>Belum ditugaskan</td><td><span class="status status-blue">Terjadwal</span></td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td>`;
+  $('#maintenanceRows').prepend(row);
+  $('#maintenanceCount').textContent = `${$('#maintenanceRows tr').length} dari 18`;
+  event.target.reset();
+  closeMaintenanceModal();
+});

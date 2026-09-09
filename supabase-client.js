@@ -40,6 +40,18 @@
     async createAsset(payload) {
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('assets').insert(payload).select().single();
+    },
+    async getMaintenanceSchedules() {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('maintenance_schedules').select('*, assets(asset_code, name, generator_serial, customers(name))').order('next_due_date', { ascending: true });
+    },
+    async createMaintenanceSchedule(payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('maintenance_schedules').insert(payload).select().single();
+    },
+    async getMaintenanceRecords() {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('maintenance_records').select('*, assets(name, asset_code, customers(name))').order('performed_at', { ascending: false });
     }
   };
 
