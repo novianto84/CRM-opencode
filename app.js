@@ -291,7 +291,7 @@ $('#employeeForm').addEventListener('submit', async (event) => {
 const customerModal = document.createElement('div');
 customerModal.className = 'modal-backdrop';
 customerModal.id = 'customerModal';
-customerModal.innerHTML = '<div class="modal customer-modal"><div class="modal-header"><div><p class="eyebrow">MASTER DATA CUSTOMER</p><h2>Tambah customer</h2></div><button class="icon-button" id="closeCustomerModal"><svg><use href="#i-close"/></svg></button></div><p class="modal-description">Customer dapat berupa perusahaan atau perorangan. Aset dan histori perawatan akan terhubung ke record ini.</p><form id="customerForm"><div class="customer-form-grid"><label>Tipe customer<select required name="type"><option value="company">Perusahaan</option><option value="person">Perorangan</option></select></label><label>Nama customer<input required name="name" placeholder="Nama perusahaan atau perorangan" /></label><label>PIC / nama kontak<input required name="contact" placeholder="Nama PIC utama" /></label><label>No. telepon<input required name="phone" placeholder="0812 0000 0000" /></label><label>Email<input type="email" name="email" placeholder="customer@email.com" /></label><label>Alamat<input name="address" placeholder="Kota / alamat singkat" /></label></div><div class="modal-actions"><button type="button" class="secondary-button" id="cancelCustomerModal">Batal</button><button class="primary-button" type="submit">Simpan customer</button></div></form></div>';
+customerModal.innerHTML = '<div class="modal customer-modal"><div class="modal-header"><div><p class="eyebrow">MASTER DATA CUSTOMER</p><h2>Tambah customer</h2></div><button class="icon-button" id="closeCustomerModal"><svg><use href="#i-close"/></svg></button></div><p class="modal-description">Customer menyimpan data akun. PIC dapat ditambahkan dan dihubungkan secara terpisah.</p><form id="customerForm"><div class="customer-form-grid"><label>Nama customer<input required name="name" placeholder="Nama perusahaan atau perorangan" /></label><label>PIC utama<input name="contact" placeholder="Nama PIC utama (opsional)" /></label><label>No. telepon<input name="phone" placeholder="0812 0000 0000" /></label><label>Email<input type="email" name="email" placeholder="customer@email.com" /></label><label>Alamat<input name="address" placeholder="Kota / alamat singkat" /></label></div><div class="modal-actions"><button type="button" class="secondary-button" id="cancelCustomerModal">Batal</button><button class="primary-button" type="submit">Simpan customer</button></div></form></div>';
 document.body.append(customerModal);
 const customerStatusField = document.createElement('label');
 customerStatusField.innerHTML = 'Status customer<select required name="status"><option value="Prospect">Prospect</option><option value="Active" selected>Active</option><option value="Inactive">Inactive</option><option value="Suspended">Suspended</option><option value="Archived">Archived</option></select>';
@@ -320,7 +320,7 @@ $('#customerForm').addEventListener('submit', async (event) => {
   let savedCustomer = null;
   if (window.crmDb?.ready) {
     const result = await window.crmDb.createCustomer({
-      customer_type: form.get('type'),
+      customer_type: null,
       name: form.get('name'),
       status: form.get('status').toLowerCase(),
       phone: form.get('phone'),
@@ -329,15 +329,22 @@ $('#customerForm').addEventListener('submit', async (event) => {
     });
     if (result.error) { window.alert(`Customer belum tersimpan: ${result.error.message}`); return; }
     savedCustomer = result.data;
+    if (form.get('contact')) {
+      const contact = await window.crmDb.createContact({ full_name: form.get('contact'), phone: form.get('phone') || null, email: form.get('email') || null });
+      if (contact.error) { window.alert(`Customer tersimpan, tetapi PIC belum tersimpan: ${contact.error.message}`); }
+      else {
+        const relation = await window.crmDb.createCustomerContactRelation({ customer_id: savedCustomer.id, contact_id: contact.data.id, full_name: contact.data.full_name, phone: contact.data.phone, email: contact.data.email, is_primary: true });
+        if (relation.error) window.alert(`Customer tersimpan, tetapi relasi PIC belum tersimpan: ${relation.error.message}`);
+      }
+    }
   }
   const name = form.get('name');
   const initials = name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
-  const isCompany = form.get('type') === 'company';
   const customerId = savedCustomer?.customer_code || `CST-${new Date().getFullYear()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
   const row = document.createElement('tr');
-  row.dataset.type = form.get('type');
-  row.dataset.customerId = customerId;
-  row.innerHTML = `<td><div class="person"><div class="avatar avatar-purple">${initials}</div><div><b>${name}</b><small>${customerId} · ${form.get('address') || 'Belum ada alamat'}</small></div></div></td><td><span class="customer-type ${isCompany ? 'type-company' : 'type-person'}">${isCompany ? 'Perusahaan' : 'Perorangan'}</span></td><td>${form.get('contact')}<br><small>${form.get('phone')}</small></td><td><b>0 unit</b></td><td>Belum dijadwalkan<br><small>Belum ada aset</small></td><td><span class="status ${form.get('status') === 'Active' ? 'status-green' : 'status-yellow'}">${form.get('status')}</span></td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td>`;
+  row.dataset.type = 'all';
+  row.dataset.customerId = savedCustomer?.id || customerId;
+  row.innerHTML = `<td><div class="person"><div class="avatar avatar-purple">${initials}</div><div><b>${name}</b><small>${customerId} · ${form.get('address') || 'Belum ada alamat'}</small></div></div></td><td><span class="customer-type">Customer</span></td><td>${form.get('contact') || 'Belum ada PIC'}<br><small>${form.get('phone') || '-'}</small></td><td><b>0 unit</b></td><td>Belum dijadwalkan<br><small>Belum ada aset</small></td><td><span class="status ${form.get('status') === 'Active' ? 'status-green' : 'status-yellow'}">${form.get('status')}</span></td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td>`;
   $('#customerRows').prepend(row);
   row.querySelector('.more-button').addEventListener('click', () => openCustomerDetail(row));
   event.target.reset();
@@ -476,10 +483,10 @@ $('#authSignup').addEventListener('click', async () => {
 });
 const renderDbCustomerRows = (customers) => customers.map((customer) => {
   const initials = customer.name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
-  const typeLabel = customer.customer_type === 'company' ? 'Perusahaan' : 'Perorangan';
+  const typeLabel = customer.customer_type === 'company' ? 'Perusahaan' : customer.customer_type === 'person' ? 'Perorangan' : 'Customer';
   const statusLabel = customer.status.charAt(0).toUpperCase() + customer.status.slice(1);
   const statusClass = customer.status === 'active' ? 'status-green' : 'status-yellow';
-  return `<tr data-type="${customer.customer_type}" data-customer-id="${customer.id}"><td><div class="person"><div class="avatar avatar-blue">${initials}</div><div><b>${customer.name}</b><small>${customer.customer_code}</small></div></div></td><td><span class="customer-type ${customer.customer_type === 'company' ? 'type-company' : 'type-person'}">${typeLabel}</span></td><td>Belum diisi<br><small>Tambahkan PIC</small></td><td><b>${customer.asset_count || 0} unit</b></td><td>${customer.next_maintenance_date || 'Belum dijadwalkan'}</td><td><span class="status ${statusClass}">${statusLabel}</span></td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`;
+  return `<tr data-type="${customer.customer_type || 'all'}" data-customer-id="${customer.id}"><td><div class="person"><div class="avatar avatar-blue">${initials}</div><div><b>${customer.name}</b><small>${customer.customer_code}</small></div></div></td><td><span class="customer-type ${customer.customer_type === 'company' ? 'type-company' : customer.customer_type === 'person' ? 'type-person' : ''}">${typeLabel}</span></td><td>Belum diisi<br><small>Tambahkan PIC</small></td><td><b>${customer.asset_count || 0} unit</b></td><td>${customer.next_maintenance_date || 'Belum dijadwalkan'}</td><td><span class="status ${statusClass}">${statusLabel}</span></td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`;
 }).join('');
 const renderDbAssetRows = (assets) => assets.map((asset) => `<tr data-status="${asset.status}" data-asset-id="${asset.asset_code}" data-asset-db-id="${asset.id}" data-customer="${asset.customers?.name || ''}" data-capacity="${asset.capacity_kva || 'Belum dicatat'} kVA" data-last-updated="${new Date(asset.updated_at).toLocaleString('id-ID')}"><td><div class="asset-name"><span class="asset-thumb">G</span><div><b>${asset.name}</b><small><span class="asset-id">${asset.asset_code}</span> · ${asset.generator_serial}</small></div></div></td><td>Genset Diesel</td><td><span class="config-cell">${asset.generator_type}<br><small>${asset.operation_system}</small><br><small class="mode-label">${asset.operation_mode}</small></span></td><td>${asset.generator_serial}</td><td>${asset.customer_locations?.name || asset.customers?.name || 'Belum diisi'}</td><td><span class="status ${asset.status === 'active' ? 'status-green' : 'status-gray'}">${asset.status === 'active' ? 'Aktif' : 'Tidak aktif'}</span></td><td>Belum dicatat</td><td>Belum dijadwalkan</td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`).join('');
 const renderDbMaintenanceRows = (schedules) => schedules.map((schedule) => {

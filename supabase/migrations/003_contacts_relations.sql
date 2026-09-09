@@ -23,6 +23,9 @@ alter table public.customer_contacts
   add column if not exists role text,
   add column if not exists notes text;
 
+alter table public.customers
+  alter column customer_type drop not null;
+
 alter table public.contacts
   add column if not exists legacy_customer_contact_id uuid unique references public.customer_contacts(id) on delete set null;
 

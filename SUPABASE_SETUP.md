@@ -17,7 +17,7 @@ Relasi contact/PIC tersedia di `supabase/migrations/003_contacts_relations.sql` 
 
 ## Struktur Utama
 
-- `customers`: customer perusahaan atau perorangan.
+- `customers`: akun customer tanpa batasan tipe perusahaan atau perorangan.
 - `customer_locations`: banyak lokasi milik customer.
 - `customer_contacts`: banyak PIC milik customer.
 - `contacts`: data detail orang/contact yang dapat terhubung ke banyak customer.
