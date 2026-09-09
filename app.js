@@ -666,9 +666,33 @@ const isAdmin = () => currentAccessLevel === 'administrator';
 const loadAccessLevel = async () => {
   currentAccessLevel = 'viewer';
   if (!window.crmDb?.ready) return;
+  const { data: sessionData } = await window.supabaseClient.auth.getUser();
+  const email = sessionData?.user?.email || '';
+  if (email) {
+    $('#profileEmail').textContent = email;
+    $('#profileName').textContent = email.split('@')[0];
+    $('#profileAvatar').textContent = email.slice(0, 2).toUpperCase();
+    $('#profileRole').textContent = 'Viewer';
+  }
   const result = await window.crmDb.getMyEmployee();
-  if (!result.error && result.data?.access_level) currentAccessLevel = result.data.access_level;
+  if (!result.error && result.data) {
+    currentAccessLevel = result.data.access_level || 'viewer';
+    if (result.data.full_name) {
+      $('#profileName').textContent = result.data.full_name;
+      $('#profileAvatar').textContent = result.data.full_name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
+    }
+    $('#profileRole').textContent = currentAccessLevel.charAt(0).toUpperCase() + currentAccessLevel.slice(1);
+  }
 };
+$('#profileMenu').addEventListener('click', (event) => { event.stopPropagation(); $('#profilePopover').classList.toggle('open'); });
+document.addEventListener('click', (event) => { if (!event.target.closest('#profilePopover') && !event.target.closest('#profileMenu')) $('#profilePopover')?.classList.remove('open'); });
+$('#logoutButton').addEventListener('click', async () => {
+  $('#profilePopover')?.classList.remove('open');
+  if (window.crmDb?.ready) await window.supabaseClient.auth.signOut();
+  currentAccessLevel = 'viewer';
+  showAuthGate();
+  showToast('Anda telah keluar.');
+});
 const formatRupiah = (value) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
 const showDatabaseWarning = (errors) => {
   if (!errors.length || $('#databaseWarning')) return;
