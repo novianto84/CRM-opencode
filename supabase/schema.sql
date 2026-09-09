@@ -58,7 +58,7 @@ create table public.employees (
 create table public.customers (
   id uuid primary key default gen_random_uuid(),
   customer_code text not null unique default public.make_customer_code(),
-  customer_type public.customer_type not null,
+  customer_type public.customer_type,
   name text not null,
   status public.customer_status not null default 'active',
   phone text,
@@ -86,20 +86,43 @@ create table public.customer_locations (
   updated_at timestamptz not null default now()
 );
 
+create table public.contacts (
+  id uuid primary key default gen_random_uuid(),
+  contact_code text not null unique default ('CON-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 6))),
+  full_name text not null,
+  position text,
+  phone text,
+  whatsapp text,
+  email text,
+  identity_number text,
+  birth_date date,
+  address text,
+  notes text,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table public.customer_contacts (
   id uuid primary key default gen_random_uuid(),
   customer_id uuid not null references public.customers(id) on delete cascade,
   location_id uuid references public.customer_locations(id) on delete set null,
+  contact_id uuid references public.contacts(id) on delete restrict,
   contact_code text not null unique default ('PIC-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 6))),
   full_name text not null,
   position text,
   phone text,
   email text,
+  role text,
+  notes text,
   is_primary boolean not null default false,
   is_active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.contacts
+  add column if not exists legacy_customer_contact_id uuid unique references public.customer_contacts(id) on delete set null;
 
 create table public.assets (
   id uuid primary key default gen_random_uuid(),
@@ -232,6 +255,11 @@ create table public.audit_logs (
 create index customers_status_idx on public.customers(status);
 create index customer_locations_customer_idx on public.customer_locations(customer_id);
 create index customer_contacts_customer_idx on public.customer_contacts(customer_id);
+create index contacts_email_idx on public.contacts(email);
+create index customer_contacts_contact_idx on public.customer_contacts(contact_id);
+create unique index if not exists customer_contacts_customer_contact_uniq
+  on public.customer_contacts (customer_id, contact_id)
+  where contact_id is not null;
 create index assets_customer_idx on public.assets(customer_id);
 create index assets_location_idx on public.assets(location_id);
 create index assets_status_idx on public.assets(status);
@@ -251,7 +279,9 @@ select
   count(distinct cc.id)::integer as contact_count,
   min(ms.next_due_date) filter (where ms.is_active and a.status = 'active') as next_maintenance_date,
   c.created_at,
-  c.updated_at
+  c.updated_at,
+  c.npwp,
+  c.logo_url
 from public.customers c
 left join public.assets a on a.customer_id = c.id
 left join public.customer_contacts cc on cc.customer_id = c.id and cc.is_active
@@ -263,7 +293,7 @@ declare
   table_name text;
 begin
   foreach table_name in array array[
-    'employees', 'customers', 'customer_locations', 'customer_contacts', 'assets',
+    'employees', 'customers', 'customer_locations', 'contacts', 'customer_contacts', 'assets',
     'maintenance_schedules', 'work_orders', 'maintenance_records', 'spare_parts'
   ] loop
     execute format('drop trigger if exists %I_updated_at on public.%I', table_name, table_name);
@@ -278,7 +308,7 @@ declare
   table_name text;
 begin
   foreach table_name in array array[
-    'employees', 'customers', 'customer_locations', 'customer_contacts', 'assets',
+    'employees', 'customers', 'customer_locations', 'contacts', 'customer_contacts', 'assets',
     'asset_ownership_history', 'maintenance_schedules', 'work_orders',
     'maintenance_records', 'spare_parts', 'maintenance_parts', 'audit_logs'
   ] loop

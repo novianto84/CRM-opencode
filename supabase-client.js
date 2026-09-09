@@ -41,6 +41,10 @@
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('customer_contacts').insert(payload).select().single();
     },
+    async getContacts() {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('contacts').select('id, full_name, position, phone, email').eq('is_active', true).order('full_name').limit(200);
+    },
     async createContact(payload) {
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('contacts').insert(payload).select().single();
