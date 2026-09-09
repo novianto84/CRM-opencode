@@ -270,15 +270,18 @@ $('#employeeRoleFilter').addEventListener('change', () => $('#employeeSearch').d
 $('#employeeForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = new FormData(event.target);
+  let savedEmployee = null;
   if (window.crmDb?.ready) {
-    const result = await window.crmDb.createEmployee({ full_name: form.get('name'), email: form.get('email'), position: form.get('position'), department: form.get('department') === 'service' ? 'Service & Teknisi' : form.get('department') === 'sales' ? 'Sales' : 'Administrasi', access_level: form.get('access').toLowerCase() });
+    const result = await window.crmDb.createEmployee({ full_name: form.get('name'), email: form.get('email'), phone: form.get('phone') || null, position: form.get('position'), department: form.get('department') === 'service' ? 'Service & Teknisi' : form.get('department') === 'sales' ? 'Sales' : 'Administrasi', access_level: form.get('access').toLowerCase() });
     if (result.error) { window.alert(`Karyawan belum tersimpan: ${result.error.message}`); return; }
+    savedEmployee = result.data;
   }
   const name = form.get('name');
   const initials = name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
   const accessClass = { Administrator: 'access-admin', Editor: 'access-editor', Operator: 'access-operator', Viewer: 'access-viewer' }[form.get('access')];
   const row = document.createElement('tr');
   row.dataset.department = form.get('department');
+  if (savedEmployee) row.dataset.employeeId = savedEmployee.id;
   row.innerHTML = `<td><div class="person"><div class="avatar avatar-purple">${initials}</div><div><b>${name}</b><small>${form.get('email')}</small></div></div></td><td>${form.get('position')}</td><td>${form.get('department') === 'service' ? 'Service & Teknisi' : form.get('department') === 'sales' ? 'Sales' : 'Administrasi'}</td><td><span class="access ${accessClass}">${form.get('access')}</span></td><td><span class="status status-green">Aktif</span></td><td>Baru saja</td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td>`;
   $('#employeeRows').prepend(row);
   event.target.reset();
@@ -467,7 +470,7 @@ const renderDbMaintenanceRows = (schedules) => schedules.map((schedule) => {
   const type = schedule.maintenance_type.charAt(0).toUpperCase() + schedule.maintenance_type.slice(1);
   return `<tr data-maintenance-status="planned"><td><div class="schedule-name"><span class="schedule-icon schedule-blue">◷</span><div><b>${schedule.title}</b><small>${schedule.id.slice(0, 8).toUpperCase()}</small></div></div></td><td>${schedule.assets?.name || '-'}<br><small>${schedule.assets?.generator_serial || schedule.assets?.asset_code || '-'}</small></td><td>${schedule.assets?.customers?.name || '-'}</td><td>${type}</td><td>${dueDate}</td><td>Belum ditugaskan</td><td><span class="status status-blue">Terjadwal</span></td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`;
 }).join('');
-const renderDbWorkOrderRows = (orders) => orders.map((order) => `<tr data-workorder-status="${order.status}" data-workorder-id="${order.id}" data-asset-db-id="${order.assets?.id || ''}"><td><span class="workorder-code">${order.work_order_code}</span></td><td><b>${order.customers?.name || '-'}</b><small>${order.assets?.name || 'Belum ada aset'}</small></td><td>${order.title}</td><td>Belum ditugaskan</td><td>${order.scheduled_at ? new Date(order.scheduled_at).toLocaleDateString('id-ID') : 'Belum dijadwalkan'}</td><td><span class="status status-blue">${order.status.replaceAll('_', ' ')}</span></td><td>${new Date(order.updated_at).toLocaleDateString('id-ID')}</td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`).join('');
+const renderDbWorkOrderRows = (orders) => orders.map((order) => `<tr data-workorder-status="${order.status}" data-workorder-id="${order.id}" data-asset-db-id="${order.assets?.id || ''}"><td><span class="workorder-code">${order.work_order_code}</span></td><td><b>${order.customers?.name || '-'}</b><small>${order.assets?.name || 'Belum ada aset'}</small></td><td>${order.title}</td><td>${order.employees?.full_name || 'Belum ditugaskan'}</td><td>${order.scheduled_at ? new Date(order.scheduled_at).toLocaleDateString('id-ID') : 'Belum dijadwalkan'}</td><td><span class="status status-blue">${order.status.replaceAll('_', ' ')}</span></td><td>${new Date(order.updated_at).toLocaleDateString('id-ID')}</td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`).join('');
 const renderDbPartRows = (parts) => parts.map((part) => `<tr data-spare-part-id="${part.spare_part_id}" data-stock="${part.stock_on_hand <= part.minimum_stock ? 'low' : 'safe'}"><td><span class="part-code">${part.part_code}</span></td><td><b>${part.name}</b><small>${part.unit}</small></td><td>Spare part</td><td>Terdaftar di database</td><td><strong class="${part.stock_on_hand <= part.minimum_stock ? 'warning-text' : ''}">${part.stock_on_hand} ${part.unit}</strong></td><td>${part.minimum_stock} ${part.unit}</td><td>Belum diatur</td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`).join('');
 const renderDbEmployeeRows = (employees) => employees.map((employee) => {
   const initials = employee.full_name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
@@ -614,14 +617,18 @@ reportModal.innerHTML = '<div class="modal report-modal"><div class="modal-heade
 document.body.append(reportModal);
 const reportPartField = document.createElement('div');
 reportPartField.className = 'report-part-field';
-reportPartField.innerHTML = '<label>Spare part yang digunakan<select name="sparePart" id="reportSparePart"><option value="">Tidak ada spare part</option></select></label><label>Jumlah<input type="number" name="sparePartQuantity" min="1" value="1" /></label>';
+  reportPartField.innerHTML = '<label>Spare part yang digunakan<select name="sparePart" id="reportSparePart"><option value="">Tidak ada spare part</option></select></label><label>Jumlah<input type="number" name="sparePartQuantity" min="1" value="1" /></label><label>Gudang<select name="warehouse" id="reportWarehouse"><option value="">Pilih gudang</option></select></label>';
 $('#reportForm .report-form-grid').after(reportPartField);
 const closeReportModal = () => reportModal.classList.remove('open');
 let activeWorkOrderRow = null;
-const openWorkOrderReport = (row) => {
+const openWorkOrderReport = async (row) => {
   activeWorkOrderRow = row;
   const partOptions = $$('#partRows tr').map((partRow) => `<option value="${partRow.dataset.sparePartId || ''}">${partRow.querySelector('.part-code')?.textContent || 'Spare part'}</option>`).filter((option) => !option.includes('value=""')).join('');
   $('#reportSparePart').innerHTML = '<option value="">Tidak ada spare part</option>' + partOptions;
+  if (window.crmDb?.ready) {
+    const warehouses = await window.crmDb.getWarehouses();
+    $('#reportWarehouse').innerHTML = warehouses.data?.map((warehouse) => `<option value="${warehouse.id}">${warehouse.name}</option>`).join('') || '<option value="">Migration gudang belum dijalankan</option>';
+  }
   $('#reportTitle').textContent = `Laporan ${row.querySelector('.workorder-code')?.textContent || 'SPK'}`;
   $('#reportSubtitle').textContent = row.cells[1]?.textContent.replace('\n', ' · ') || '';
   reportModal.classList.add('open');
@@ -629,19 +636,21 @@ const openWorkOrderReport = (row) => {
 $('#closeReportModal').addEventListener('click', closeReportModal);
 $('#cancelReportModal').addEventListener('click', closeReportModal);
 reportModal.addEventListener('click', (event) => { if (event.target === reportModal) closeReportModal(); });
-$$('#workOrderRows tr').forEach((row, index) => { row.dataset.workorderId = row.dataset.workorderId || `demo-${index + 1}`; row.querySelector('.more-button').addEventListener('click', () => openWorkOrderReport(row)); });
+$$('#workOrderRows tr').forEach((row, index) => { row.dataset.workorderId = row.dataset.workorderId || `demo-${index + 1}`; });
+$('#workOrderRows').addEventListener('click', (event) => { const button = event.target.closest('.more-button'); const row = button?.closest('tr'); if (row) openWorkOrderReport(row); });
 $('#reportForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = new FormData(event.target);
   const workOrderId = activeWorkOrderRow?.dataset.workorderId;
   const assetId = activeWorkOrderRow?.dataset.assetDbId;
   const checklist = form.getAll('checklist');
+  if (window.crmDb?.ready && form.get('sparePart') && !form.get('warehouse')) { window.alert('Pilih gudang untuk mencatat pengeluaran spare part.'); return; }
   if (window.crmDb?.ready && (workOrderId?.startsWith('demo-') || !assetId)) { window.alert('SPK demo belum memiliki relasi database. Buat SPK dari customer dan aset yang tersimpan di database.'); return; }
   if (window.crmDb?.ready) {
     const report = await window.crmDb.createMaintenanceRecord({ work_order_id: workOrderId, asset_id: assetId, maintenance_type: 'preventive', status: form.get('status'), performed_at: new Date().toISOString(), operating_hours: Number(form.get('operatingHours')), findings: form.get('findings') || null, work_summary: `${form.get('summary')}\nChecklist: ${checklist.join(', ') || 'Tidak ada'}` });
     if (report.error) { window.alert(`Laporan belum tersimpan: ${report.error.message}`); return; }
     if (form.get('sparePart')) {
-      const partResult = await window.crmDb.createMaintenancePart({ maintenance_record_id: report.data.id, spare_part_id: form.get('sparePart'), quantity: Number(form.get('sparePartQuantity')) || 1, unit_cost: 0 });
+      const partResult = await window.crmDb.createMaintenancePart({ maintenance_record_id: report.data.id, spare_part_id: form.get('sparePart'), warehouse_id: form.get('warehouse') || null, quantity: Number(form.get('sparePartQuantity')) || 1, unit_cost: 0 });
       if (partResult.error) { window.alert(`Laporan tersimpan, tetapi spare part belum tercatat: ${partResult.error.message}`); return; }
     }
     const updated = await window.crmDb.updateWorkOrder(workOrderId, { status: form.get('status') === 'completed' ? 'completed' : 'in_progress', completed_at: form.get('status') === 'completed' ? new Date().toISOString() : null, customer_approved_at: form.get('customerApproved') ? new Date().toISOString() : null });
@@ -710,7 +719,11 @@ $('#quotationForm').addEventListener('submit', async (event) => {
     if (item.error) { window.alert(`Penawaran dibuat, tetapi item belum tersimpan: ${item.error.message}`); return; }
   }
   event.target.reset();
-  closeQuotationModal();
+    closeQuotationModal();
+    if (window.crmDb?.ready) {
+      const refreshed = await window.crmDb.getQuotations();
+      if (!refreshed.error) { quotationCache = refreshed.data || []; $('#quotationList').innerHTML = renderQuotations(quotationCache); }
+    }
 });
 
 const stockModal = document.createElement('div');

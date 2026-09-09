@@ -55,7 +55,7 @@
     },
     async getWorkOrders() {
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
-      return window.supabaseClient.from('work_orders').select('*, customers(name), assets(id, name, asset_code)').order('updated_at', { ascending: false });
+      return window.supabaseClient.from('work_orders').select('*, customers(name), assets(id, name, asset_code), employees!work_orders_assigned_to_fkey(full_name)').order('updated_at', { ascending: false });
     },
     async createWorkOrder(payload) {
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
