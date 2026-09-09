@@ -19,6 +19,7 @@ Profil customer dan logo tersedia di `supabase/migrations/004_customer_profile.s
 9. Jalankan query `supabase/migrations/005_cleanup_orphan_contacts.sql` untuk menghapus duplikat contact dan mencegah relasi ganda.
 10. Jalankan query `supabase/migrations/006_drop_legacy_contact_link.sql` untuk membuang kolom backfill sementara agar relasi contact tidak ambigu.
 11. Jalankan query `supabase/migrations/007_employee_sensitive_fields.sql` untuk field sensitif karyawan (foto, HP/email kedua, NPWP, bank) dan view direktori publik.
+12. Jalankan query `supabase/migrations/008_contact_photo_secondary_fields.sql` untuk foto contact, HP 2, dan email 2 (nomor WhatsApp lama dipindahkan ke HP 2).
 
 ## Struktur Utama
 

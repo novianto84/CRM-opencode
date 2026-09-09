@@ -96,15 +96,15 @@ const renderDbContactRows = (relations) => {
   return [...grouped.values()].map(({ key, contact, fallback, customers, roles, primary }) => {
     const name = contact.full_name || fallback.full_name || '-';
     const initials = name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
-    const email = contact.email || fallback.email || '';
-    const phone = contact.phone || contact.whatsapp || fallback.phone || '';
-    return `<tr data-contact-id="${key}"><td><div class="person"><div class="avatar avatar-blue">${initials}</div><div><b>${name}</b><small>${email || phone || '-'}</small></div></div></td><td><span class="status ${primary ? 'status-green' : 'status-blue'}">${primary ? 'PIC Utama' : 'PIC'}</span></td><td>${uniq(customers).join(', ') || '-'}</td><td>${phone || '-'}</td><td><b>${uniq(roles).join(', ') || '-'}</b></td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`;
+    const email = contact.email || contact.email2 || fallback.email || '';
+    const phone = contact.phone || contact.phone2 || fallback.phone || '';
+    return `<tr data-contact-id="${key}"><td><div class="person"><div class="avatar avatar-blue"${contact.photo_url ? ` style="background-image:url('${contact.photo_url}');background-size:cover;color:transparent"` : ''}>${initials}</div><div><b>${name}</b><small>${email || phone || '-'}</small></div></div></td><td><span class="status ${primary ? 'status-green' : 'status-blue'}">${primary ? 'PIC Utama' : 'PIC'}</span></td><td>${uniq(customers).join(', ') || '-'}</td><td>${phone || '-'}</td><td><b>${uniq(roles).join(', ') || '-'}</b></td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`;
   }).join('');
 };
 const renderPlainContactRows = (contacts) => contacts.map((contact) => {
   const name = contact.full_name || '-';
   const initials = name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
-  return `<tr data-contact-id="${contact.id}"><td><div class="person"><div class="avatar avatar-blue">${initials}</div><div><b>${name}</b><small>${contact.email || contact.phone || '-'}</small></div></div></td><td><span class="status status-blue">PIC</span></td><td>-</td><td>${contact.phone || '-'}</td><td><b>${contact.position || '-'}</b></td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`;
+  return `<tr data-contact-id="${contact.id}"><td><div class="person"><div class="avatar avatar-blue"${contact.photo_url ? ` style="background-image:url('${contact.photo_url}');background-size:cover;color:transparent"` : ''}>${initials}</div><div><b>${name}</b><small>${contact.email || contact.email2 || contact.phone || contact.phone2 || '-'}</small></div></div></td><td><span class="status status-blue">PIC</span></td><td>-</td><td>${contact.phone || '-'}</td><td><b>${contact.position || '-'}</b></td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`;
 }).join('');
 function paintContactTables(html, count) {
   $('#contactRows').innerHTML = html;
@@ -148,7 +148,7 @@ async function reloadContactDirectory() {
 }
 const contactEditorModal = document.createElement('div');
 contactEditorModal.className = 'modal-backdrop';
-contactEditorModal.innerHTML = '<div class="modal relation-modal"><div class="modal-header"><div><p class="eyebrow">CONTACT DETAIL</p><h2>Edit contact</h2></div><button class="icon-button" id="closeContactEditor"><svg><use href="#i-close"/></svg></button></div><form id="contactEditorForm"><label>Nama lengkap<input required name="name" placeholder="Nama lengkap" /></label><label>Jabatan<input name="position" placeholder="Jabatan" /></label><label>No. telepon<input name="phone" placeholder="0812 0000 0000" /></label><label>WhatsApp<input name="whatsapp" placeholder="Nomor WhatsApp" /></label><label>Email<input type="email" name="email" placeholder="email@customer.com" /></label><label>Nomor identitas<input name="identityNumber" placeholder="KTP / identitas lain" /></label><label>Tanggal lahir<input type="date" name="birthDate" /></label><label>Alamat<input name="contactAddress" placeholder="Alamat tinggal" /></label><label>Catatan<textarea name="contactNotes" rows="2" placeholder="Catatan tambahan"></textarea></label><div class="detail-section-heading"><h3>Customer terhubung</h3></div><div class="customer-contact-list" id="contactCustomerLinks"></div><div class="modal-actions"><button type="button" class="secondary-button" id="cancelContactEditor">Batal</button><button class="primary-button" type="submit">Simpan perubahan</button></div></form></div>';
+contactEditorModal.innerHTML = '<div class="modal relation-modal"><div class="modal-header"><div><p class="eyebrow">CONTACT DETAIL</p><h2>Edit contact</h2></div><button class="icon-button" id="closeContactEditor"><svg><use href="#i-close"/></svg></button></div><div class="company-logo" id="contactPhotoPreviewWrap"><span id="contactPhotoPreview">?</span><div><b>Foto profil</b><small id="contactPhotoNote">Belum ada foto</small></div></div><form id="contactEditorForm"><label>Nama lengkap<input required name="name" placeholder="Nama lengkap" /></label><label>Jabatan<input name="position" placeholder="Jabatan" /></label><label>Handphone 1<input name="phone" placeholder="0812 0000 0000" /></label><label>Handphone 2<input name="phone2" placeholder="Nomor kedua" /></label><label>Email 1<input type="email" name="email" placeholder="email@customer.com" /></label><label>Email 2<input type="email" name="email2" placeholder="Email kedua (opsional)" /></label><label>Foto profil<input type="file" name="photo" accept="image/png,image/jpeg,image/webp" /></label><label>Nomor identitas<input name="identityNumber" placeholder="KTP / identitas lain" /></label><label>Tanggal lahir<input type="date" name="birthDate" /></label><label>Alamat<input name="contactAddress" placeholder="Alamat tinggal" /></label><label>Catatan<textarea name="contactNotes" rows="2" placeholder="Catatan tambahan"></textarea></label><div class="detail-section-heading"><h3>Customer terhubung</h3></div><div class="customer-contact-list" id="contactCustomerLinks"></div><div class="modal-actions"><button type="button" class="secondary-button" id="cancelContactEditor">Batal</button><button class="primary-button" type="submit">Simpan perubahan</button></div></form></div>';
 document.body.append(contactEditorModal);
 let editingContactId = null;
 const closeContactEditor = () => contactEditorModal.classList.remove('open');
@@ -164,8 +164,21 @@ async function openContactEditor(contactId) {
   $('#contactEditorForm input[name="name"]').value = contact.full_name || '';
   $('#contactEditorForm input[name="position"]').value = contact.position || '';
   $('#contactEditorForm input[name="phone"]').value = contact.phone || '';
-  $('#contactEditorForm input[name="whatsapp"]').value = contact.whatsapp || '';
+  $('#contactEditorForm input[name="phone2"]').value = contact.phone2 || '';
   $('#contactEditorForm input[name="email"]').value = contact.email || '';
+  $('#contactEditorForm input[name="email2"]').value = contact.email2 || '';
+  const photoPreview = $('#contactPhotoPreview');
+  if (contact.photo_url) {
+    photoPreview.style.backgroundImage = `url("${contact.photo_url}")`;
+    photoPreview.style.backgroundSize = 'cover';
+    photoPreview.style.color = 'transparent';
+    $('#contactPhotoNote').textContent = 'Foto tersimpan';
+  } else {
+    photoPreview.style.backgroundImage = '';
+    photoPreview.style.color = '';
+    photoPreview.textContent = (contact.full_name || '?').slice(0, 1).toUpperCase();
+    $('#contactPhotoNote').textContent = 'Belum ada foto';
+  }
   $('#contactEditorForm input[name="identityNumber"]').value = contact.identity_number || '';
   $('#contactEditorForm input[name="birthDate"]').value = contact.birth_date || '';
   $('#contactEditorForm input[name="contactAddress"]').value = contact.address || '';
@@ -207,14 +220,21 @@ $('#contactEditorForm').addEventListener('submit', async (event) => {
     full_name: form.get('name'),
     position: form.get('position') || null,
     phone: form.get('phone') || null,
-    whatsapp: form.get('whatsapp') || null,
+    phone2: form.get('phone2') || null,
     email: form.get('email') || null,
+    email2: form.get('email2') || null,
     identity_number: form.get('identityNumber') || null,
     birth_date: form.get('birthDate') || null,
     address: form.get('contactAddress') || null,
     notes: form.get('contactNotes') || null
   });
   if (result.error) { showToast(`Contact belum tersimpan: ${result.error.message}`, true); return; }
+  const contactPhoto = form.get('photo');
+  if (contactPhoto?.size) {
+    const upload = await window.crmDb.uploadContactPhoto(editingContactId, contactPhoto);
+    if (upload.error) showToast(`Contact tersimpan, tetapi foto gagal: ${upload.error.message}`, true);
+    else await window.crmDb.updateContact(editingContactId, { photo_url: upload.data.publicUrl });
+  }
   closeContactEditor();
   showToast('Contact berhasil diperbarui.');
   editingContactId = null;
@@ -650,7 +670,7 @@ const openCustomerDetail = async (row) => {
       $('#customerContactList').innerHTML = contacts.data.map((contact) => {
         const initials = contact.full_name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
         const person = contact.contacts || contact;
-        return `<div class="detail-pic"><div class="avatar avatar-green">${initials}</div><div><b>${person.full_name}</b><small>${contact.role || person.position || 'PIC Customer'}</small><small>${person.phone || person.email || '-'}</small></div>${contact.is_primary ? '<span class="status status-green">Utama</span>' : ''}${isAdmin() ? `<button class="icon-button delete-pic" data-relation-id="${contact.id}" data-pic-name="${person.full_name}" title="Hapus PIC">✕</button>` : ''}</div>`;
+        return `<div class="detail-pic"><div class="avatar avatar-green"${person.photo_url ? ` style="background-image:url('${person.photo_url}');background-size:cover;color:transparent"` : ''}>${initials}</div><div><b>${person.full_name}</b><small>${contact.role || person.position || 'PIC Customer'}</small><small>${person.phone || person.phone2 || person.email || person.email2 || '-'}</small></div>${contact.is_primary ? '<span class="status status-green">Utama</span>' : ''}${isAdmin() ? `<button class="icon-button delete-pic" data-relation-id="${contact.id}" data-pic-name="${person.full_name}" title="Hapus PIC">✕</button>` : ''}</div>`;
       }).join('');
     } else $('#customerContactList').innerHTML = '<div class="detail-pic"><div><b>Belum ada PIC</b><small>Tambahkan contact customer</small></div></div>';
     if (locations.data?.length) {
@@ -696,7 +716,7 @@ customerDetailModal.querySelector('.customer-address').insertAdjacentHTML('befor
 
 const relationModal = document.createElement('div');
 relationModal.className = 'modal-backdrop';
-relationModal.innerHTML = '<div class="modal relation-modal"><div class="modal-header"><div><p class="eyebrow" id="relationEyebrow">CUSTOMER RELATION</p><h2 id="relationTitle">Tambah PIC</h2></div><button class="icon-button" id="closeRelationModal"><svg><use href="#i-close"/></svg></button></div><form id="relationForm"><label id="relationExistingLabel">Gunakan contact yang sudah ada<select name="existingContact" id="relationExistingContact"><option value="">-- Buat contact baru --</option></select></label><label id="relationNameLabel">Nama PIC<input required name="name" placeholder="Nama lengkap" /></label><label id="relationPositionLabel">Jabatan<input name="position" placeholder="Jabatan atau keterangan" /></label><label id="relationRoleLabel">Peran PIC<input name="role" placeholder="Contoh: Procurement, Finance, Teknisi" /></label><label>No. telepon<input name="phone" placeholder="0812 0000 0000" /></label><label>Email<input type="email" name="email" placeholder="email@customer.com" /></label><label id="relationWhatsappLabel">WhatsApp<input name="whatsapp" placeholder="Nomor WhatsApp" /></label><label id="relationIdentityLabel">Nomor identitas<input name="identityNumber" placeholder="KTP / identitas lain" /></label><label id="relationBirthDateLabel">Tanggal lahir<input type="date" name="birthDate" /></label><label id="relationContactAddressLabel">Alamat contact<input name="contactAddress" placeholder="Alamat tinggal contact" /></label><label id="relationNotesLabel">Catatan<textarea name="contactNotes" rows="2" placeholder="Catatan tambahan"></textarea></label><label id="relationAddressLabel" hidden>Alamat lokasi<input name="address" placeholder="Alamat lengkap lokasi" /></label><div class="modal-actions"><button type="button" class="secondary-button" id="cancelRelationModal">Batal</button><button class="primary-button" type="submit">Simpan</button></div></form></div>';
+relationModal.innerHTML = '<div class="modal relation-modal"><div class="modal-header"><div><p class="eyebrow" id="relationEyebrow">CUSTOMER RELATION</p><h2 id="relationTitle">Tambah PIC</h2></div><button class="icon-button" id="closeRelationModal"><svg><use href="#i-close"/></svg></button></div><form id="relationForm"><label id="relationExistingLabel">Gunakan contact yang sudah ada<select name="existingContact" id="relationExistingContact"><option value="">-- Buat contact baru --</option></select></label><label id="relationNameLabel">Nama PIC<input required name="name" placeholder="Nama lengkap" /></label><label id="relationPositionLabel">Jabatan<input name="position" placeholder="Jabatan atau keterangan" /></label><label id="relationRoleLabel">Peran PIC<input name="role" placeholder="Contoh: Procurement, Finance, Teknisi" /></label><label>No. telepon<input name="phone" placeholder="0812 0000 0000" /></label><label id="relationPhone2Label">Handphone 2<input name="phone2" placeholder="Nomor kedua" /></label><label>Email<input type="email" name="email" placeholder="email@customer.com" /></label><label id="relationEmail2Label">Email 2<input type="email" name="email2" placeholder="Email kedua (opsional)" /></label><label id="relationIdentityLabel">Nomor identitas<input name="identityNumber" placeholder="KTP / identitas lain" /></label><label id="relationBirthDateLabel">Tanggal lahir<input type="date" name="birthDate" /></label><label id="relationContactAddressLabel">Alamat contact<input name="contactAddress" placeholder="Alamat tinggal contact" /></label><label id="relationNotesLabel">Catatan<textarea name="contactNotes" rows="2" placeholder="Catatan tambahan"></textarea></label><label id="relationAddressLabel" hidden>Alamat lokasi<input name="address" placeholder="Alamat lengkap lokasi" /></label><div class="modal-actions"><button type="button" class="secondary-button" id="cancelRelationModal">Batal</button><button class="primary-button" type="submit">Simpan</button></div></form></div>';
 document.body.append(relationModal);
 let relationMode = 'pic';
 let relationCustomerId = null;
@@ -710,7 +730,7 @@ const openRelationModal = async (mode) => {
   $('#relationExistingLabel').hidden = mode !== 'pic';
   $('#relationPositionLabel').hidden = mode !== 'pic';
   $('#relationRoleLabel').hidden = mode !== 'pic';
-  ['relationWhatsappLabel', 'relationIdentityLabel', 'relationBirthDateLabel', 'relationContactAddressLabel', 'relationNotesLabel'].forEach((id) => { $(`#${id}`).hidden = mode !== 'pic'; });
+  ['relationPhone2Label', 'relationEmail2Label', 'relationIdentityLabel', 'relationBirthDateLabel', 'relationContactAddressLabel', 'relationNotesLabel'].forEach((id) => { $(`#${id}`).hidden = mode !== 'pic'; });
   $('#relationAddressLabel').hidden = mode === 'pic';
   $('#relationNameLabel').firstChild.textContent = mode === 'pic' ? 'Nama PIC' : 'Nama lokasi';
   if (mode === 'pic' && window.crmDb?.ready) {
@@ -718,7 +738,7 @@ const openRelationModal = async (mode) => {
     const contactsResult = await window.crmDb.getContacts();
     if (!contactsResult.error && contactsResult.data) {
       contactCache = contactsResult.data;
-      $('#relationExistingContact').innerHTML = '<option value="">-- Buat contact baru --</option>' + contactCache.map((c) => `<option value="${c.id}">${c.full_name}${c.phone ? ` · ${c.phone}` : ''}</option>`).join('');
+      $('#relationExistingContact').innerHTML = '<option value="">-- Buat contact baru --</option>' + contactCache.map((c) => `<option value="${c.id}">${c.full_name}${c.phone || c.phone2 ? ` · ${c.phone || c.phone2}` : ''}</option>`).join('');
     }
     $('#relationExistingContact').dispatchEvent(new Event('change'));
   }
@@ -726,7 +746,7 @@ const openRelationModal = async (mode) => {
 };
 $('#relationExistingContact').addEventListener('change', (event) => {
   const picked = Boolean(event.target.value);
-  ['relationNameLabel', 'relationPositionLabel', 'relationWhatsappLabel', 'relationIdentityLabel', 'relationBirthDateLabel', 'relationContactAddressLabel', 'relationNotesLabel'].forEach((id) => {
+  ['relationNameLabel', 'relationPositionLabel', 'relationPhone2Label', 'relationEmail2Label', 'relationIdentityLabel', 'relationBirthDateLabel', 'relationContactAddressLabel', 'relationNotesLabel'].forEach((id) => {
     const label = $(`#${id}`);
     if (label) label.style.opacity = picked ? '0.45' : '';
   });
@@ -758,7 +778,7 @@ $('#relationForm').addEventListener('submit', async (event) => {
     } else {
       const newName = String(form.get('name') || '').trim();
       if (existingRelations.data?.some((rel) => (rel.contacts?.full_name || rel.full_name || '').toLowerCase() === newName.toLowerCase())) { showToast('PIC dengan nama tersebut sudah terhubung ke customer ini.', true); return; }
-      const contact = await window.crmDb.createContact({ full_name: newName, position: form.get('position') || null, phone: form.get('phone') || null, email: form.get('email') || null, whatsapp: form.get('whatsapp') || null, identity_number: form.get('identityNumber') || null, birth_date: form.get('birthDate') || null, address: form.get('contactAddress') || null, notes: form.get('contactNotes') || null });
+      const contact = await window.crmDb.createContact({ full_name: newName, position: form.get('position') || null, phone: form.get('phone') || null, phone2: form.get('phone2') || null, email: form.get('email') || null, email2: form.get('email2') || null, identity_number: form.get('identityNumber') || null, birth_date: form.get('birthDate') || null, address: form.get('contactAddress') || null, notes: form.get('contactNotes') || null });
       result = contact.error ? contact : await window.crmDb.createCustomerContactRelation({ customer_id: relationCustomerId, contact_id: contact.data.id, full_name: form.get('name'), position: form.get('position') || null, phone: form.get('phone') || null, email: form.get('email') || null, role: form.get('role') || null });
     }
   } else result = await window.crmDb.createCustomerLocation({ customer_id: relationCustomerId, name: form.get('name'), address: form.get('address'), contact_phone: form.get('phone') || null });

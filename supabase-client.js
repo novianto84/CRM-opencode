@@ -43,7 +43,7 @@
     },
     async getContacts() {
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
-      return window.supabaseClient.from('contacts').select('id, full_name, position, phone, email').eq('is_active', true).order('full_name').limit(200);
+      return window.supabaseClient.from('contacts').select('id, full_name, position, phone, phone2, email, email2, photo_url').eq('is_active', true).order('full_name').limit(200);
     },
     async getContact(id) {
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
@@ -53,13 +53,21 @@
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('contacts').update(payload).eq('id', id).select().single();
     },
+    async uploadContactPhoto(contactId, file) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      const path = `${contactId}/${Date.now()}-${file.name.replace(/[^a-z0-9.\-_]/gi, '-')}`;
+      const upload = await window.supabaseClient.storage.from('contact-photos').upload(path, file, { upsert: true, contentType: file.type });
+      if (upload.error) return { data: null, error: upload.error };
+      const { data } = window.supabaseClient.storage.from('contact-photos').getPublicUrl(path);
+      return { data: { publicUrl: data.publicUrl }, error: null };
+    },
     async getContactCustomers(contactId) {
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('customer_contacts').select('id, role, is_primary, customers(name)').eq('contact_id', contactId).eq('is_active', true).order('created_at', { ascending: false });
     },
     async getContactDirectory() {
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
-      return window.supabaseClient.from('customer_contacts').select('id, role, position, is_primary, created_at, contacts!customer_contacts_contact_id_fkey(id, full_name, position, phone, whatsapp, email), customers(name)').eq('is_active', true).order('created_at', { ascending: false }).limit(500);
+      return window.supabaseClient.from('customer_contacts').select('id, role, position, is_primary, created_at, contacts!customer_contacts_contact_id_fkey(id, full_name, position, phone, phone2, email, email2, photo_url), customers(name)').eq('is_active', true).order('created_at', { ascending: false }).limit(500);
     },
     async createContact(payload) {
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
