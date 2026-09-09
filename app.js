@@ -340,7 +340,8 @@ const closeCustomerDetail = () => customerDetailModal.classList.remove('open');
 $('#closeCustomerDetail').addEventListener('click', closeCustomerDetail);
 $('#closeCustomerDetailButton').addEventListener('click', closeCustomerDetail);
 customerDetailModal.addEventListener('click', (event) => { if (event.target === customerDetailModal) closeCustomerDetail(); });
-const openCustomerDetail = (row) => {
+const openCustomerDetail = async (row) => {
+  activeCustomerRow = row;
   const cells = row.querySelectorAll('td');
   const name = row.querySelector('.person b').textContent;
   const initials = row.querySelector('.avatar').textContent;
@@ -352,10 +353,66 @@ const openCustomerDetail = (row) => {
   $('#customerDetailType').className = `customer-type ${row.dataset.type === 'person' ? 'type-person' : 'type-company'}`;
   $('#customerAssetTotal').textContent = cells[3].textContent;
   $('#customerMaintenanceTotal').textContent = name === 'Lina Marlina' ? '1 jadwal' : '3 jadwal';
+  if (window.crmDb?.ready && row.dataset.customerId) {
+    const [contacts, locations] = await Promise.all([window.crmDb.getCustomerContacts(row.dataset.customerId), window.crmDb.getCustomerLocations(row.dataset.customerId)]);
+    const contact = contacts.data?.[0];
+    if (contact) {
+      $('.detail-pic b').textContent = contact.full_name;
+      $('.detail-pic small').textContent = contact.position || 'PIC Customer';
+      $('.detail-pic small:last-child').textContent = contact.phone || contact.email || '-';
+    }
+    if (locations.data?.length) {
+      $('#customerLocationSummary').innerHTML = `<small>Lokasi customer (${locations.data.length})</small><b>${locations.data[0].name} · ${locations.data[0].address}</b>`;
+    }
+  }
   customerDetailModal.classList.add('open');
 };
+$$('#customerRows tr').forEach((row, index) => { row.dataset.customerId = row.dataset.customerId || `demo-${index + 1}`; });
 $$('#customerRows .more-button').forEach((button) => button.addEventListener('click', () => openCustomerDetail(button.closest('tr'))));
 $('#customerDetailEdit').addEventListener('click', () => { closeCustomerDetail(); customerModal.classList.add('open'); });
+const detailActionButtons = customerDetailModal.querySelectorAll('.detail-section-heading .text-button');
+detailActionButtons[1].id = 'managePicButton';
+customerDetailModal.querySelector('.customer-address').id = 'customerLocationSummary';
+customerDetailModal.querySelector('.customer-address').insertAdjacentHTML('beforeend', '<button class="text-button relation-add-button" id="addLocationButton">Tambah lokasi</button>');
+
+const relationModal = document.createElement('div');
+relationModal.className = 'modal-backdrop';
+relationModal.innerHTML = '<div class="modal relation-modal"><div class="modal-header"><div><p class="eyebrow" id="relationEyebrow">CUSTOMER RELATION</p><h2 id="relationTitle">Tambah PIC</h2></div><button class="icon-button" id="closeRelationModal"><svg><use href="#i-close"/></svg></button></div><form id="relationForm"><label id="relationNameLabel">Nama PIC<input required name="name" placeholder="Nama lengkap" /></label><label id="relationPositionLabel">Jabatan<input name="position" placeholder="Jabatan atau keterangan" /></label><label>No. telepon<input name="phone" placeholder="0812 0000 0000" /></label><label>Email<input type="email" name="email" placeholder="email@customer.com" /></label><label id="relationAddressLabel" hidden>Alamat lokasi<input name="address" placeholder="Alamat lengkap lokasi" /></label><div class="modal-actions"><button type="button" class="secondary-button" id="cancelRelationModal">Batal</button><button class="primary-button" type="submit">Simpan</button></div></form></div>';
+document.body.append(relationModal);
+let relationMode = 'pic';
+let relationCustomerId = null;
+const closeRelationModal = () => relationModal.classList.remove('open');
+const openRelationModal = (mode) => {
+  relationMode = mode;
+  relationCustomerId = activeCustomerRow?.dataset.customerId;
+  $('#relationTitle').textContent = mode === 'pic' ? 'Tambah PIC' : 'Tambah lokasi';
+  $('#relationEyebrow').textContent = mode === 'pic' ? 'CUSTOMER PIC' : 'CUSTOMER LOCATION';
+  $('#relationPositionLabel').hidden = mode !== 'pic';
+  $('#relationAddressLabel').hidden = mode === 'pic';
+  $('#relationNameLabel').firstChild.textContent = mode === 'pic' ? 'Nama PIC' : 'Nama lokasi';
+  relationModal.classList.add('open');
+};
+let activeCustomerRow = null;
+$('#managePicButton').addEventListener('click', () => openRelationModal('pic'));
+$('#addLocationButton').addEventListener('click', () => openRelationModal('location'));
+$('#closeRelationModal').addEventListener('click', closeRelationModal);
+$('#cancelRelationModal').addEventListener('click', closeRelationModal);
+relationModal.addEventListener('click', (event) => { if (event.target === relationModal) closeRelationModal(); });
+const originalOpenCustomerDetail = openCustomerDetail;
+// Track the selected customer for PIC and location actions.
+$$('#customerRows .more-button').forEach((button) => button.addEventListener('click', () => { activeCustomerRow = button.closest('tr'); }));
+$('#relationForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!relationCustomerId || relationCustomerId.startsWith('demo-')) { window.alert('Data demo belum memiliki ID database. Pilih customer yang sudah tersimpan di Supabase.'); return; }
+  const form = new FormData(event.target);
+  const result = relationMode === 'pic'
+    ? await window.crmDb.createCustomerContact({ customer_id: relationCustomerId, full_name: form.get('name'), position: form.get('position') || null, phone: form.get('phone') || null, email: form.get('email') || null })
+    : await window.crmDb.createCustomerLocation({ customer_id: relationCustomerId, name: form.get('name'), address: form.get('address'), contact_phone: form.get('phone') || null });
+  if (result.error) { window.alert(`Data belum tersimpan: ${result.error.message}`); return; }
+  event.target.reset();
+  closeRelationModal();
+  if (activeCustomerRow) await originalOpenCustomerDetail(activeCustomerRow);
+});
 
 const authGate = document.createElement('div');
 authGate.className = 'auth-gate';
@@ -392,7 +449,7 @@ const renderDbCustomerRows = (customers) => customers.map((customer) => {
   const typeLabel = customer.customer_type === 'company' ? 'Perusahaan' : 'Perorangan';
   const statusLabel = customer.status.charAt(0).toUpperCase() + customer.status.slice(1);
   const statusClass = customer.status === 'active' ? 'status-green' : 'status-yellow';
-  return `<tr data-type="${customer.customer_type}"><td><div class="person"><div class="avatar avatar-blue">${initials}</div><div><b>${customer.name}</b><small>${customer.customer_code}</small></div></div></td><td><span class="customer-type ${customer.customer_type === 'company' ? 'type-company' : 'type-person'}">${typeLabel}</span></td><td>Belum diisi<br><small>Tambahkan PIC</small></td><td><b>${customer.asset_count || 0} unit</b></td><td>${customer.next_maintenance_date || 'Belum dijadwalkan'}</td><td><span class="status ${statusClass}">${statusLabel}</span></td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`;
+  return `<tr data-type="${customer.customer_type}" data-customer-id="${customer.id}"><td><div class="person"><div class="avatar avatar-blue">${initials}</div><div><b>${customer.name}</b><small>${customer.customer_code}</small></div></div></td><td><span class="customer-type ${customer.customer_type === 'company' ? 'type-company' : 'type-person'}">${typeLabel}</span></td><td>Belum diisi<br><small>Tambahkan PIC</small></td><td><b>${customer.asset_count || 0} unit</b></td><td>${customer.next_maintenance_date || 'Belum dijadwalkan'}</td><td><span class="status ${statusClass}">${statusLabel}</span></td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`;
 }).join('');
 const renderDbAssetRows = (assets) => assets.map((asset) => `<tr data-status="${asset.status}" data-asset-id="${asset.asset_code}" data-customer="${asset.customers?.name || ''}" data-capacity="${asset.capacity_kva || 'Belum dicatat'} kVA" data-last-updated="${new Date(asset.updated_at).toLocaleString('id-ID')}"><td><div class="asset-name"><span class="asset-thumb">G</span><div><b>${asset.name}</b><small><span class="asset-id">${asset.asset_code}</span> · ${asset.generator_serial}</small></div></div></td><td>Genset Diesel</td><td><span class="config-cell">${asset.generator_type}<br><small>${asset.operation_system}</small><br><small class="mode-label">${asset.operation_mode}</small></span></td><td>${asset.generator_serial}</td><td>${asset.customer_locations?.name || asset.customers?.name || 'Belum diisi'}</td><td><span class="status ${asset.status === 'active' ? 'status-green' : 'status-gray'}">${asset.status === 'active' ? 'Aktif' : 'Tidak aktif'}</span></td><td>Belum dicatat</td><td>Belum dijadwalkan</td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`).join('');
 async function loadDatabaseData() {
