@@ -35,7 +35,7 @@
     },
     async getCustomerContacts(customerId) {
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
-      return window.supabaseClient.from('customer_contacts').select('*, contacts(*)').eq('customer_id', customerId).eq('is_active', true).order('is_primary', { ascending: false });
+      return window.supabaseClient.from('customer_contacts').select('*, contacts!customer_contacts_contact_id_fkey(*)').eq('customer_id', customerId).eq('is_active', true).order('is_primary', { ascending: false });
     },
     async createCustomerContact(payload) {
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };

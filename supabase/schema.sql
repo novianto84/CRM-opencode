@@ -121,9 +121,6 @@ create table public.customer_contacts (
   updated_at timestamptz not null default now()
 );
 
-alter table public.contacts
-  add column if not exists legacy_customer_contact_id uuid unique references public.customer_contacts(id) on delete set null;
-
 create table public.assets (
   id uuid primary key default gen_random_uuid(),
   asset_code text not null unique default public.make_asset_code(),

@@ -17,6 +17,7 @@ Profil customer dan logo tersedia di `supabase/migrations/004_customer_profile.s
 7. Jalankan query `supabase/migrations/003_contacts_relations.sql` untuk memisahkan data contact dari relasi customer. Migration ini wajib dijalankan sebelum menambah PIC baru.
 8. Jalankan query `supabase/migrations/004_customer_profile.sql` untuk mengaktifkan NPWP dan storage logo customer.
 9. Jalankan query `supabase/migrations/005_cleanup_orphan_contacts.sql` untuk menghapus duplikat contact dan mencegah relasi ganda.
+10. Jalankan query `supabase/migrations/006_drop_legacy_contact_link.sql` untuk membuang kolom backfill sementara agar relasi contact tidak ambigu.
 
 ## Struktur Utama
 
