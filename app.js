@@ -984,6 +984,17 @@ const printQuotation = (quote) => {
   printWindow.document.write(`<title>${quote.quotation_code}</title><style>body{font:14px Arial;color:#182235;max-width:800px;margin:40px auto}h1{margin-bottom:4px}table{width:100%;border-collapse:collapse;margin-top:28px}th,td{padding:10px;border-bottom:1px solid #ddd;text-align:left}td:last-child,th:last-child{text-align:right}.total{text-align:right;font-size:18px;font-weight:bold;margin-top:20px}.subtotal{text-align:right;color:#555;margin-top:20px}</style><h1>Penawaran ${quote.quotation_code}</h1><p>Customer: <b>${quote.customers?.name || '-'}</b><br>Berlaku sampai: ${quote.valid_until || '-'}</p><table><thead><tr><th>Deskripsi</th><th>Jumlah</th><th>Harga</th><th>Diskon</th><th>Total</th></tr></thead><tbody>${items.map((item) => `<tr><td>${item.description}</td><td>${item.quantity} ${item.unit}</td><td>${formatRupiah(item.unit_price)}</td><td>${formatRupiah(item.discount)}</td><td>${formatRupiah(item.line_total)}</td></tr>`).join('')}</tbody></table><p class="subtotal">Subtotal: ${formatRupiah(quote.subtotal)}${Number(quote.tax) > 0 ? `<br>PPN: ${formatRupiah(quote.tax)}` : ''}</p><p class="total">Total: ${formatRupiah(quote.total)}</p>`);
   printWindow.document.close(); printWindow.focus(); printWindow.print();
 };
+(function checkAdapterSync() {
+  const required = ['getVendors', 'createVendor', 'deleteVendor', 'getVendorContacts', 'createVendorContactRelation', 'updateVendorContact', 'getContactVendors', 'getAllVendorContacts'];
+  const missing = required.filter((fn) => typeof window.crmDb?.[fn] !== 'function');
+  if (missing.length && !$('#adapterWarning')) {
+    const warning = document.createElement('div');
+    warning.id = 'adapterWarning';
+    warning.className = 'database-warning';
+    warning.textContent = 'File aplikasi tidak sinkron (cache lama). Tutup semua tab, buka incognito baru, dan login ulang.';
+    document.body.append(warning);
+  }
+})();
 async function loadDatabaseData() {
   let customerResult = { error: new Error('belum dimuat') };
   let assetResult = { error: new Error('belum dimuat') };
@@ -2707,7 +2718,11 @@ $('#vendorMasterForm').addEventListener('submit', async (event) => {
     showToast(`Pemasok belum tersimpan: ${err?.message || err}`, true);
   }
 });
-$('#vendorMasterButton').addEventListener('click', async () => { await refreshVendorMaster(); vendorMasterModal.classList.add('open'); });
+$('#vendorMasterButton').addEventListener('click', async () => {
+  vendorMasterModal.classList.add('open');
+  try { await refreshVendorMaster(); }
+  catch (err) { showToast(`Daftar pemasok gagal dimuat: ${err?.message || err}`, true); }
+});
 async function reloadVendorDirectory() {
   if (!window.crmDb?.ready) return;
   const [vendors, relations] = await Promise.all([window.crmDb.getVendors(), window.crmDb.getAllVendorContacts()]);
