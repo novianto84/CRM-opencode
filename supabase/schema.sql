@@ -529,6 +529,73 @@ create table public.serial_numbers (
   unique (spare_part_id, serial_code)
 );
 
+create type public.item_request_status as enum ('draft', 'approved', 'partial', 'fulfilled', 'cancelled');
+
+create table public.item_requests (
+  id uuid primary key default gen_random_uuid(),
+  request_code text not null unique default ('REQ-' || to_char(current_date, 'YYYY') || '-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 6))),
+  purpose text,
+  needed_date date,
+  status public.item_request_status not null default 'draft',
+  requested_by uuid references public.employees(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table public.item_request_items (
+  id uuid primary key default gen_random_uuid(),
+  request_id uuid not null references public.item_requests(id) on delete cascade,
+  spare_part_id uuid references public.spare_parts(id) on delete set null,
+  description text not null,
+  quantity numeric(12, 2) not null check (quantity > 0),
+  fulfilled_qty numeric(12, 2) not null default 0 check (fulfilled_qty >= 0),
+  created_at timestamptz not null default now()
+);
+
+create type public.manufacture_status as enum ('draft', 'in_progress', 'completed', 'cancelled');
+
+create table public.manufacture_orders (
+  id uuid primary key default gen_random_uuid(),
+  order_code text not null unique default ('MFG-' || to_char(current_date, 'YYYY') || '-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 6))),
+  finished_part_id uuid references public.spare_parts(id) on delete set null,
+  quantity_planned numeric(12, 2) not null check (quantity_planned > 0),
+  quantity_produced numeric(12, 2) not null default 0 check (quantity_produced >= 0),
+  warehouse_id uuid references public.warehouses(id) on delete set null,
+  status public.manufacture_status not null default 'draft',
+  labor_cost numeric(14, 2) not null default 0 check (labor_cost >= 0),
+  overhead_cost numeric(14, 2) not null default 0 check (overhead_cost >= 0),
+  material_cost numeric(14, 2) not null default 0 check (material_cost >= 0),
+  started_at date,
+  finished_at date,
+  notes text,
+  created_by uuid references public.employees(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table public.manufacture_materials (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null references public.manufacture_orders(id) on delete cascade,
+  spare_part_id uuid references public.spare_parts(id) on delete restrict,
+  warehouse_id uuid references public.warehouses(id) on delete set null,
+  qty_required numeric(12, 2) not null check (qty_required > 0),
+  qty_used numeric(12, 2) not null default 0 check (qty_used >= 0),
+  unit_cost numeric(14, 2) not null default 0 check (unit_cost >= 0),
+  created_at timestamptz not null default now()
+);
+
+create table public.price_adjustments (
+  id uuid primary key default gen_random_uuid(),
+  adjustment_code text not null unique default ('ADJ-' || to_char(current_date, 'YYYY') || '-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 6))),
+  scope_type text not null check (scope_type in ('all', 'category', 'brand')),
+  scope_value text,
+  percent_change numeric(7, 2) not null,
+  affected_count integer not null default 0,
+  notes text,
+  created_by uuid references public.employees(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
 create or replace function public.refresh_sales_order_total()
 returns trigger
 language plpgsql
@@ -667,7 +734,8 @@ begin
     'units', 'item_units', 'spare_part_bundle_items', 'warehouses', 'vendors', 'stock_opname_orders',
     'stock_opname_items', 'item_price_tiers', 'item_substitutes', 'purchase_orders', 'purchase_order_items',
     'goods_receipts', 'goods_receipt_items', 'sales_orders', 'sales_order_items', 'delivery_orders',
-    'delivery_items', 'sales_invoices', 'invoice_payments', 'serial_numbers', 'maintenance_parts', 'audit_logs'
+    'delivery_items', 'sales_invoices', 'invoice_payments', 'serial_numbers', 'item_requests', 'item_request_items',
+    'manufacture_orders', 'manufacture_materials', 'price_adjustments', 'maintenance_parts', 'audit_logs'
   ] loop
     execute format('alter table public.%I enable row level security', table_name);
     execute format('drop policy if exists authenticated_full_access on public.%I', table_name);

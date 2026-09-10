@@ -1015,6 +1015,7 @@ async function loadDatabaseData() {
   }
   await reloadPurchaseOrders();
   await reloadSales();
+  await reloadProduction();
   const directoryError = await loadContactDirectory();
   const databaseErrors = [['Customer', customerResult], ['Aset', assetResult], ['Maintenance', scheduleResult], ['SPK', workOrderResult], ['Spare part', partsResult], ['Karyawan', employeeResult], ['Quotation', quotationResult]].filter(([, result]) => result.error).map(([name, result]) => `${name}: ${result.error.message}`);
   if (directoryError) databaseErrors.push(`Kontak: ${directoryError.message}`);
@@ -1768,6 +1769,238 @@ applyTwoColumn(maintenanceModal, 560);
 applyTwoColumn(workOrderModal, 560);
 applyTwoColumn(reportModal, 600);
 applyTwoColumn($('#assetModalBackdrop'), 640);
+let requestCache = [];
+let manufactureCache = [];
+const requestStatusClass = { draft: 'status-gray', approved: 'status-yellow', partial: 'status-purple', fulfilled: 'status-green', cancelled: 'status-gray' };
+const manufactureStatusClass = { draft: 'status-gray', in_progress: 'status-purple', completed: 'status-green', cancelled: 'status-gray' };
+async function reloadProduction() {
+  if (!window.crmDb?.ready) return;
+  const [requestResult, manufactureResult] = await Promise.all([window.crmDb.getItemRequests(), window.crmDb.getManufactureOrders()]);
+  if (!requestResult.error && requestResult.data) {
+    requestCache = requestResult.data;
+    if (requestCache.length) {
+      $('#requestList').innerHTML = requestCache.slice(0, 5).map((req) => {
+        const items = req.item_request_items || [];
+        return `<div><span class="quotation-code">${req.request_code}</span><div><b>${req.purpose || 'Permintaan barang'}</b><small>${items.map((item) => `${item.description} × ${item.quantity}`).join(' · ') || 'Belum ada item'}</small></div><span class="status ${requestStatusClass[req.status] || 'status-gray'}">${req.status}</span>${req.status === 'draft' && isAdmin() ? `<button class="text-button approve-request" data-id="${req.id}">Setujui</button>` : ''}${req.status === 'draft' && isAdmin() ? `<button class="icon-button cancel-request" data-id="${req.id}" title="Batalkan">✕</button>` : ''}</div>`;
+      }).join('');
+    }
+  }
+  if (!manufactureResult.error && manufactureResult.data) {
+    manufactureCache = manufactureResult.data;
+    if (manufactureCache.length) {
+      $('#manufactureList').innerHTML = manufactureCache.slice(0, 5).map((order) => `<div><span class="quotation-code">${order.order_code}</span><div><b>Hasil ${order.quantity_produced}/${order.quantity_planned}</b><small>${(order.manufacture_materials || []).length} bahan baku · HPP ${formatRupiah(Number(order.material_cost) + Number(order.labor_cost) + Number(order.overhead_cost))}</small></div><span class="status ${manufactureStatusClass[order.status] || 'status-gray'}">${order.status.replace('_', ' ')}</span>${order.status === 'draft' ? `<button class="text-button start-manufacture" data-id="${order.id}">Mulai</button>` : ''}${order.status === 'in_progress' ? `<button class="text-button finish-manufacture" data-id="${order.id}">Selesaikan</button>` : ''}${isAdmin() && ['draft', 'in_progress'].includes(order.status) ? `<button class="icon-button cancel-manufacture" data-id="${order.id}" title="Batalkan">✕</button>` : ''}</div>`).join('');
+    }
+  }
+  if (requestCache.length || manufactureCache.length) $('#productionCount').textContent = `${requestCache.length} permintaan · ${manufactureCache.length} produksi`;
+}
+const requestModal = document.createElement('div');
+requestModal.className = 'modal-backdrop';
+requestModal.innerHTML = '<div class="modal relation-modal"><div class="modal-header"><div><p class="eyebrow">PERMINTAAN BARANG</p><h2>Minta barang</h2></div><button class="icon-button" id="closeRequestModal"><svg><use href="#i-close"/></svg></button></div><form id="requestForm"><label>Keperluan<input required name="purpose" placeholder="Contoh: Restock, proyek A" /></label><label>Dibutuhkan tanggal<input type="date" name="neededDate" /></label><div class="detail-section-heading"><h3>Item diminta</h3><button type="button" class="text-button" id="addRequestItemButton">+ Tambah baris</button></div><div id="requestItemRows"></div><div class="modal-actions"><button type="button" class="secondary-button" id="cancelRequestModal">Batal</button><button class="primary-button" type="submit">Simpan permintaan</button></div></form></div>';
+document.body.append(requestModal);
+applyTwoColumn(requestModal, 720);
+const closeRequestModal = () => requestModal.classList.remove('open');
+$('#closeRequestModal').addEventListener('click', closeRequestModal);
+$('#cancelRequestModal').addEventListener('click', closeRequestModal);
+requestModal.addEventListener('click', (event) => { if (event.target === requestModal) closeRequestModal(); });
+const requestItemRow = () => {
+  const row = document.createElement('div');
+  row.className = 'unit-conv-row';
+  row.innerHTML = `<select name="requestPart" style="grid-column:1/-1">${partCache.map((part) => `<option value="${part.spare_part_id}">${part.part_code} · ${part.name}</option>`).join('')}</select><input type="number" name="requestQty" min="0.01" step="any" placeholder="Qty" value="1" /><span></span><button type="button" class="icon-button remove-unit-row" title="Hapus">✕</button>`;
+  row.querySelector('.remove-unit-row').addEventListener('click', () => row.remove());
+  return row;
+};
+$('#addRequestItemButton').addEventListener('click', () => $('#requestItemRows').append(requestItemRow()));
+$('#createRequestButton').addEventListener('click', () => { $('#requestItemRows').innerHTML = ''; $('#requestItemRows').append(requestItemRow()); requestModal.classList.add('open'); });
+$('#requestForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = new FormData(event.target);
+  const request = await window.crmDb.createItemRequest({ purpose: form.get('purpose'), needed_date: form.get('neededDate') || null });
+  if (request.error) { showToast(`Permintaan gagal: ${request.error.message}`, true); return; }
+  const rows = $$('#requestItemRows .unit-conv-row').map((row) => {
+    const part = partCache.find((item) => String(item.spare_part_id) === row.querySelector('select[name="requestPart"]').value);
+    return { request_id: request.data.id, spare_part_id: part?.spare_part_id || null, description: part ? `${part.part_code} · ${part.name}` : 'Item', quantity: Number(row.querySelector('input[name="requestQty"]').value) || 0 };
+  }).filter((row) => row.quantity > 0);
+  if (rows.length) await window.crmDb.createItemRequestItems(rows);
+  event.target.reset();
+  $('#requestItemRows').innerHTML = '';
+  closeRequestModal();
+  showToast('Permintaan barang tersimpan.');
+  await reloadProduction();
+});
+$('#requestList').addEventListener('click', async (event) => {
+  const approve = event.target.closest('.approve-request');
+  if (approve) {
+    const result = await window.crmDb.updateItemRequest(approve.dataset.id, { status: 'approved' });
+    if (result.error) showToast(`Gagal: ${result.error.message}`, true);
+    else { showToast('Permintaan disetujui.'); await reloadProduction(); }
+    return;
+  }
+  const cancel = event.target.closest('.cancel-request');
+  if (cancel && window.confirm('Batalkan permintaan ini?')) {
+    const result = await window.crmDb.updateItemRequest(cancel.dataset.id, { status: 'cancelled' });
+    if (result.error) showToast(`Gagal: ${result.error.message}`, true);
+    else { showToast('Permintaan dibatalkan.'); await reloadProduction(); }
+  }
+});
+const priceAdjustModal = document.createElement('div');
+priceAdjustModal.className = 'modal-backdrop';
+priceAdjustModal.innerHTML = '<div class="modal relation-modal"><div class="modal-header"><div><p class="eyebrow">PENYESUAIAN HARGA</p><h2>Sesuaikan harga jual</h2></div><button class="icon-button" id="closePriceAdjustModal"><svg><use href="#i-close"/></svg></button></div><form id="priceAdjustForm"><label>Cakupan<select name="scope" id="priceAdjustScope"><option value="all">Semua barang</option><option value="category">Per kategori</option><option value="brand">Per merk</option></select></label><label id="priceAdjustValueLabel" hidden>Nilai cakupan<input name="scopeValue" list="categoryDatalist" placeholder="Nama kategori / merk" /></label><label>Perubahan harga (%)<input required type="number" step="0.01" name="percent" placeholder="Contoh: 10 atau -5" /></label><label>Catatan<input name="notes" placeholder="Alasan penyesuaian" /></label><div class="modal-actions"><button type="button" class="secondary-button" id="cancelPriceAdjustModal">Batal</button><button class="primary-button" type="submit">Terapkan</button></div></form></div>';
+document.body.append(priceAdjustModal);
+applyTwoColumn(priceAdjustModal, 560);
+const closePriceAdjustModal = () => priceAdjustModal.classList.remove('open');
+$('#closePriceAdjustModal').addEventListener('click', closePriceAdjustModal);
+$('#cancelPriceAdjustModal').addEventListener('click', closePriceAdjustModal);
+priceAdjustModal.addEventListener('click', (event) => { if (event.target === priceAdjustModal) closePriceAdjustModal(); });
+$('#priceAdjustScope').addEventListener('change', (event) => { $('#priceAdjustValueLabel').hidden = event.target.value === 'all'; });
+$('#adjustPriceButton').addEventListener('click', () => priceAdjustModal.classList.add('open'));
+$('#priceAdjustForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!isAdmin()) { showToast('Hanya administrator yang dapat menyesuaikan harga.', true); return; }
+  const form = new FormData(event.target);
+  const scope = form.get('scope');
+  const scopeValue = form.get('scopeValue') || null;
+  const percent = Number(form.get('percent'));
+  if (!percent) { showToast('Isi persentase perubahan.', true); return; }
+  const targets = partCache.filter((part) => scope === 'all' || (scope === 'category' && part.category === scopeValue) || (scope === 'brand' && part.brand === scopeValue));
+  if (!targets.length) { showToast('Tidak ada barang dalam cakupan.', true); return; }
+  if (!window.confirm(`Ubah ${targets.length} harga sebesar ${percent}%?`)) return;
+  let affected = 0;
+  for (const part of targets) {
+    const newPrice = Math.max(0, Math.round(Number(part.list_price || 0) * (1 + percent / 100)));
+    const result = await window.crmDb.updateSparePart(part.spare_part_id, { list_price: newPrice });
+    if (!result.error) { affected += 1; part.list_price = newPrice; }
+  }
+  await window.crmDb.createPriceAdjustment({ scope_type: scope, scope_value: scopeValue, percent_change: percent, affected_count: affected, notes: form.get('notes') || null });
+  event.target.reset();
+  closePriceAdjustModal();
+  showToast(`${affected} harga diperbarui.`);
+  const refreshed = await window.crmDb.getSpareParts();
+  if (!refreshed.error && refreshed.data) {
+    partCache = refreshed.data;
+    $('#partRows').innerHTML = renderDbPartRows(partCache);
+    bindPartRowButtons();
+    refreshInventoryMetrics();
+  }
+});
+const manufactureModal = document.createElement('div');
+manufactureModal.className = 'modal-backdrop';
+manufactureModal.innerHTML = '<div class="modal relation-modal"><div class="modal-header"><div><p class="eyebrow">PEKERJAAN PESANAN</p><h2>Buat produksi</h2></div><button class="icon-button" id="closeManufactureModal"><svg><use href="#i-close"/></svg></button></div><form id="manufactureForm"><label>Barang hasil<select required name="finishedPart" id="manufactureFinishedSelect"></select></label><div class="quotation-form-grid"><label>Qty rencana<input required type="number" name="plannedQty" min="0.01" step="any" value="1" /></label><label>Gudang hasil<select required name="warehouse" id="manufactureWarehouseSelect"></select></label></div><label>Catatan<input name="notes" placeholder="Keterangan produksi" /></label><div class="detail-section-heading"><h3>Bahan baku</h3><button type="button" class="text-button" id="addManufactureMaterialButton">+ Tambah bahan</button></div><div id="manufactureMaterialRows"></div><div class="modal-actions"><button type="button" class="secondary-button" id="cancelManufactureModal">Batal</button><button class="primary-button" type="submit">Simpan produksi</button></div></form></div>';
+document.body.append(manufactureModal);
+applyTwoColumn(manufactureModal, 720);
+const closeManufactureModal = () => manufactureModal.classList.remove('open');
+$('#closeManufactureModal').addEventListener('click', closeManufactureModal);
+$('#cancelManufactureModal').addEventListener('click', closeManufactureModal);
+manufactureModal.addEventListener('click', (event) => { if (event.target === manufactureModal) closeManufactureModal(); });
+const manufactureMaterialRow = (preset) => {
+  const row = document.createElement('div');
+  row.className = 'unit-conv-row';
+  row.innerHTML = `<select name="materialPart" style="grid-column:1/-1">${partCache.map((part) => `<option value="${part.spare_part_id}"${preset && String(preset.spare_part_id) === String(part.spare_part_id) ? ' selected' : ''}>${part.part_code} · ${part.name}</option>`).join('')}</select><input type="number" name="materialQty" min="0.01" step="any" placeholder="Qty perlu" value="${preset?.quantity || 1}" /><input type="number" name="materialCost" min="0" placeholder="Biaya satuan" value="${preset?.unitCost || ''}" /><button type="button" class="icon-button remove-unit-row" title="Hapus">✕</button>`;
+  row.querySelector('.remove-unit-row').addEventListener('click', () => row.remove());
+  const partSelect = row.querySelector('select[name="materialPart"]');
+  partSelect.addEventListener('change', () => { const part = partCache.find((item) => String(item.spare_part_id) === partSelect.value); if (part?.last_purchase_price) row.querySelector('input[name="materialCost"]').value = part.last_purchase_price; });
+  return row;
+};
+$('#addManufactureMaterialButton').addEventListener('click', () => $('#manufactureMaterialRows').append(manufactureMaterialRow()));
+$('#manufactureFinishedSelect').addEventListener('change', async (event) => {
+  $('#manufactureMaterialRows').innerHTML = '';
+  const bundle = await window.crmDb.getBundleChildren(event.target.value);
+  (bundle.data || []).forEach((row) => {
+    const planned = Number($('#manufactureForm input[name="plannedQty"]').value) || 1;
+    $('#manufactureMaterialRows').append(manufactureMaterialRow({ spare_part_id: row.child_id, quantity: Number(row.quantity) * planned, unitCost: '' }));
+  });
+});
+$('#createManufactureButton').addEventListener('click', async () => {
+  $('#manufactureFinishedSelect').innerHTML = partCache.map((part) => `<option value="${part.spare_part_id}">${part.part_code} · ${part.name}</option>`).join('');
+  const warehouses = await window.crmDb.getWarehouses();
+  $('#manufactureWarehouseSelect').innerHTML = (warehouses.data || []).map((w) => `<option value="${w.id}">${w.name}</option>`).join('');
+  $('#manufactureMaterialRows').innerHTML = '';
+  $('#manufactureMaterialRows').append(manufactureMaterialRow());
+  manufactureModal.classList.add('open');
+});
+$('#manufactureForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = new FormData(event.target);
+  const order = await window.crmDb.createManufactureOrder({ finished_part_id: form.get('finishedPart'), quantity_planned: Number(form.get('plannedQty')), warehouse_id: form.get('warehouse'), status: 'in_progress', notes: form.get('notes') || null, started_at: new Date().toISOString().slice(0, 10) });
+  if (order.error) { showToast(`Produksi gagal: ${order.error.message}`, true); return; }
+  const rows = $$('#manufactureMaterialRows .unit-conv-row').map((row) => {
+    const part = partCache.find((item) => String(item.spare_part_id) === row.querySelector('select[name="materialPart"]').value);
+    return { order_id: order.data.id, spare_part_id: part?.spare_part_id || null, warehouse_id: form.get('warehouse'), qty_required: Number(row.querySelector('input[name="materialQty"]').value) || 0, unit_cost: Number(row.querySelector('input[name="materialCost"]').value) || Number(part?.last_purchase_price) || 0 };
+  }).filter((row) => row.spare_part_id && row.qty_required > 0);
+  if (rows.length) await window.crmDb.createManufactureMaterials(rows);
+  event.target.reset();
+  $('#manufactureMaterialRows').innerHTML = '';
+  closeManufactureModal();
+  showToast(`Produksi ${order.data.order_code} dimulai.`);
+  await reloadProduction();
+});
+const manufactureFinishModal = document.createElement('div');
+manufactureFinishModal.className = 'modal-backdrop';
+manufactureFinishModal.innerHTML = '<div class="modal relation-modal"><div class="modal-header"><div><p class="eyebrow">PENYELESAIAN</p><h2 id="manufactureFinishTitle">Selesaikan produksi</h2></div><button class="icon-button" id="closeManufactureFinish"><svg><use href="#i-close"/></svg></button></div><form id="manufactureFinishForm"><div class="quotation-form-grid"><label>Qty hasil jadi<input required type="number" name="producedQty" min="0.01" step="any" /></label><label>Biaya tenaga kerja (Rp)<input type="number" name="laborCost" min="0" placeholder="0" /></label><label>Biaya overhead (Rp)<input type="number" name="overheadCost" min="0" placeholder="0" /></label></div><div class="detail-section-heading"><h3>Bahan terpakai</h3></div><div id="manufactureUsedRows"></div><div class="modal-actions"><button type="button" class="secondary-button" id="cancelManufactureFinish">Batal</button><button class="primary-button" type="submit">Selesaikan</button></div></form></div>';
+document.body.append(manufactureFinishModal);
+applyTwoColumn(manufactureFinishModal, 720);
+const closeManufactureFinish = () => manufactureFinishModal.classList.remove('open');
+$('#closeManufactureFinish').addEventListener('click', closeManufactureFinish);
+$('#cancelManufactureFinish').addEventListener('click', closeManufactureFinish);
+manufactureFinishModal.addEventListener('click', (event) => { if (event.target === manufactureFinishModal) closeManufactureFinish(); });
+let activeManufactureId = null;
+async function openManufactureFinish(orderId) {
+  const orders = await window.crmDb.getManufactureOrders();
+  const order = orders.data?.find((item) => String(item.id) === String(orderId));
+  if (!order) { showToast('Data produksi tidak ditemukan.', true); return; }
+  activeManufactureId = order.id;
+  $('#manufactureFinishTitle').textContent = `Selesaikan ${order.order_code}`;
+  $('#manufactureFinishForm input[name="producedQty"]').value = order.quantity_planned;
+  $('#manufactureUsedRows').innerHTML = (order.manufacture_materials || []).map((material) => `<div class="unit-conv-row" data-material="${material.id}" data-part="${material.spare_part_id}" data-warehouse="${material.warehouse_id || ''}" data-cost="${material.unit_cost || 0}"><span style="grid-column:1/-1"><b>${material.qty_required}</b> <small>dibutuhkan</small></span><input type="number" name="usedQty" min="0" step="any" placeholder="Qty terpakai" value="${material.qty_required}" /><span></span><span></span></div>`).join('');
+  manufactureFinishModal.classList.add('open');
+}
+$('#manufactureFinishForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = new FormData(event.target);
+  const produced = Number(form.get('producedQty'));
+  if (!(produced > 0)) { showToast('Isi qty hasil jadi.', true); return; }
+  const orders = await window.crmDb.getManufactureOrders();
+  const order = orders.data?.find((item) => String(item.id) === String(activeManufactureId));
+  if (!order) return;
+  const labor = Number(form.get('laborCost')) || 0;
+  const overhead = Number(form.get('overheadCost')) || 0;
+  let materialCost = 0;
+  for (const row of $$('#manufactureUsedRows .unit-conv-row')) {
+    const used = Number(row.querySelector('input[name="usedQty"]')?.value) || 0;
+    const unitCost = Number(row.dataset.cost) || 0;
+    materialCost += used * unitCost;
+    await window.crmDb.updateManufactureMaterial(row.dataset.material, { qty_used: used });
+    if (used > 0 && row.dataset.part) {
+      await window.crmDb.createInventoryMovement({ spare_part_id: row.dataset.part, warehouse_id: row.dataset.warehouse || order.warehouse_id, movement_type: 'outbound', quantity: used, unit_cost: unitCost, reference_type: 'manufacture', reference_id: order.id, notes: `Bahan produksi ${order.order_code}` });
+    }
+  }
+  const finished = partCache.find((item) => String(item.spare_part_id) === String(order.finished_part_id));
+  const unitCost = (materialCost + labor + overhead) / produced;
+  if (order.finished_part_id) {
+    await window.crmDb.createInventoryMovement({ spare_part_id: order.finished_part_id, warehouse_id: order.warehouse_id, movement_type: 'inbound', quantity: produced, unit_cost: unitCost, reference_type: 'manufacture', reference_id: order.id, notes: `Hasil produksi ${order.order_code}` });
+    if (finished) finished.last_purchase_price = unitCost;
+  }
+  await window.crmDb.updateManufactureOrder(order.id, { quantity_produced: produced, labor_cost: labor, overhead_cost: overhead, material_cost: materialCost, status: 'completed', finished_at: new Date().toISOString().slice(0, 10) });
+  closeManufactureFinish();
+  showToast(`Produksi selesai. HPP satuan ${formatRupiah(unitCost)}.`);
+  await reloadProduction();
+});
+$('#manufactureList').addEventListener('click', async (event) => {
+  const start = event.target.closest('.start-manufacture');
+  if (start) {
+    const result = await window.crmDb.updateManufactureOrder(start.dataset.id, { status: 'in_progress', started_at: new Date().toISOString().slice(0, 10) });
+    if (result.error) showToast(`Gagal: ${result.error.message}`, true);
+    else { showToast('Produksi dimulai.'); await reloadProduction(); }
+    return;
+  }
+  const finish = event.target.closest('.finish-manufacture');
+  if (finish) { openManufactureFinish(finish.dataset.id); return; }
+  const cancel = event.target.closest('.cancel-manufacture');
+  if (cancel && isAdmin() && window.confirm('Batalkan produksi ini?')) {
+    const result = await window.crmDb.updateManufactureOrder(cancel.dataset.id, { status: 'cancelled' });
+    if (result.error) showToast(`Gagal: ${result.error.message}`, true);
+    else { showToast('Produksi dibatalkan.'); await reloadProduction(); }
+  }
+});
 let soCache = [];
 let deliveryCache = [];
 let invoiceCache = [];

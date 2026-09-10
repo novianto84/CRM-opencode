@@ -28,6 +28,8 @@ Profil customer dan logo tersedia di `supabase/migrations/004_customer_profile.s
 18. Jalankan query `supabase/migrations/014_purchasing.sql` untuk purchase order dan penerimaan barang.
 19. Jalankan query `supabase/migrations/015_sales.sql` untuk pesanan penjualan, pengiriman, faktur, dan pembayaran.
 20. Jalankan query `supabase/migrations/016_serial_numbers.sql` untuk pelacakan nomor seri/batch dan tanggal kadaluarsa.
+21. Jalankan query `supabase/migrations/017_item_requests.sql` untuk permintaan barang.
+22. Jalankan query `supabase/migrations/018_manufacturing_pricing.sql` untuk produksi dan penyesuaian harga global.
 
 ## Struktur Utama
 
@@ -50,6 +52,9 @@ Profil customer dan logo tersedia di `supabase/migrations/004_customer_profile.s
 - `sales_orders`, `sales_order_items`: pesanan penjualan (bisa dari penawaran).
 - `delivery_orders`, `delivery_items`: surat jalan yang mengurangi stok.
 - `sales_invoices`, `invoice_payments`: faktur dan pelunasannya.
+- `item_requests`, `item_request_items`: permintaan barang internal.
+- `manufacture_orders`, `manufacture_materials`: pekerjaan pesanan dan HPP produksi.
+- `price_adjustments`: audit penyesuaian harga jual global.
 - `maintenance_parts`: suku cadang yang dipakai pada pekerjaan.
 - `employees`: user internal dan level akses.
 - `audit_logs`: histori perubahan record.

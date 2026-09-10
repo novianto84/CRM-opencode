@@ -401,6 +401,46 @@
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('spare_part_bundle_items').delete().eq('id', id);
     },
+    async getItemRequests() {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('item_requests').select('*, item_request_items(*)').order('created_at', { ascending: false }).limit(100);
+    },
+    async createItemRequest(payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('item_requests').insert(payload).select().single();
+    },
+    async updateItemRequest(id, payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('item_requests').update(payload).eq('id', id).select().single();
+    },
+    async createItemRequestItems(rows) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('item_request_items').insert(rows).select();
+    },
+    async getManufactureOrders() {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('manufacture_orders').select('*, manufacture_materials(*)').order('created_at', { ascending: false }).limit(100);
+    },
+    async createManufactureOrder(payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('manufacture_orders').insert(payload).select().single();
+    },
+    async updateManufactureOrder(id, payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('manufacture_orders').update(payload).eq('id', id).select().single();
+    },
+    async createManufactureMaterials(rows) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('manufacture_materials').insert(rows).select();
+    },
+    async updateManufactureMaterial(id, payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('manufacture_materials').update(payload).eq('id', id).select().single();
+    },
+    async createPriceAdjustment(payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('price_adjustments').insert(payload).select().single();
+    },
     async uploadItemPhoto(sparePartId, file) {
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       const path = `${sparePartId}/${Date.now()}-${file.name.replace(/[^a-z0-9.\-_]/gi, '-')}`;
