@@ -5,8 +5,14 @@ const showToast = (message, error = false) => {
   toast.className = `app-toast${error ? ' app-toast-error' : ''}`;
   toast.textContent = message;
   document.body.append(toast);
-  window.setTimeout(() => toast.remove(), 3200);
+  window.setTimeout(() => toast.remove(), error ? 6000 : 3200);
 };
+window.addEventListener('error', (event) => {
+  showToast(`Galat halaman: ${event.message}`, true);
+});
+window.addEventListener('unhandledrejection', (event) => {
+  showToast(`Galat data: ${event.reason?.message || event.reason}`, true);
+});
 const applyTwoColumn = (modalEl, boxWidth) => {
   if (!modalEl || !modalEl.querySelector) return;
   const narrow = window.matchMedia && window.matchMedia('(max-width:600px)').matches;
