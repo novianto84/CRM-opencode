@@ -325,6 +325,54 @@
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('goods_receipt_items').insert(rows).select();
     },
+    async getSalesOrders() {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('sales_orders').select('*, sales_order_items(*)').order('created_at', { ascending: false }).limit(100);
+    },
+    async createSalesOrder(payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('sales_orders').insert(payload).select().single();
+    },
+    async updateSalesOrder(id, payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('sales_orders').update(payload).eq('id', id).select().single();
+    },
+    async createSalesOrderItems(rows) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('sales_order_items').insert(rows).select();
+    },
+    async updateSalesOrderItem(id, payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('sales_order_items').update(payload).eq('id', id).select().single();
+    },
+    async getDeliveries() {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('delivery_orders').select('*, delivery_items(*)').order('created_at', { ascending: false }).limit(100);
+    },
+    async createDelivery(payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('delivery_orders').insert(payload).select().single();
+    },
+    async createDeliveryItems(rows) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('delivery_items').insert(rows).select();
+    },
+    async getInvoices() {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('sales_invoices').select('*, invoice_payments(*)').order('created_at', { ascending: false }).limit(100);
+    },
+    async createInvoice(payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('sales_invoices').insert(payload).select().single();
+    },
+    async updateInvoice(id, payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('sales_invoices').update(payload).eq('id', id).select().single();
+    },
+    async createPayment(payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('invoice_payments').insert(payload).select().single();
+    },
     async uploadItemPhoto(sparePartId, file) {
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       const path = `${sparePartId}/${Date.now()}-${file.name.replace(/[^a-z0-9.\-_]/gi, '-')}`;

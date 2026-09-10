@@ -310,12 +310,14 @@ $$('.nav-item').forEach((item) => item.addEventListener('click', () => {
     const isAsset = module === 'Asset';
     const isEmployee = module === 'Karyawan';
     const isCustomer = module === 'Customer';
+    const isSales = module === 'Transaksi';
     const isContact = module === 'Kontak';
     const isMaintenance = module === 'Maintenance';
     const isWorkOrder = module === 'SPK';
     const isInventory = module === 'Inventory';
-    $('#overviewView').hidden = isCompany || isAsset || isEmployee || isCustomer || isContact || isMaintenance || isWorkOrder || isInventory;
+    $('#overviewView').hidden = isCompany || isAsset || isEmployee || isCustomer || isContact || isSales || isMaintenance || isWorkOrder || isInventory;
     $('#contactView').hidden = !isContact;
+    $('#salesView').hidden = !isSales;
     $('#assetView').hidden = !isAsset;
     $('#employeeView').hidden = !isEmployee;
     $('#customerView').hidden = !isCustomer;
@@ -957,7 +959,7 @@ const showDatabaseWarning = (errors) => {
   warning.innerHTML = `<b>Sebagian data belum dapat dimuat:</b> ${errors.join(' · ')}`;
   document.body.append(warning);
 };
-const renderQuotations = (quotations) => quotations.slice(0, 5).map((quote) => `<div><span class="quotation-code">${quote.quotation_code}</span><div><b>${quote.customers?.name || 'Customer'}</b><small>${quote.quotation_items?.map((item) => `${item.description} x ${item.quantity}`).join(' · ') || 'Belum ada item'}</small></div><strong>${formatRupiah(quote.total)}</strong><span class="status status-${quote.status === 'approved' ? 'green' : quote.status === 'sent' ? 'yellow' : 'gray'}">${quote.status}</span><button class="more-button print-quotation" data-quotation-id="${quote.id}" title="Cetak"><svg><use href="#i-more"/></svg></button></div>`).join('');
+const renderQuotations = (quotations) => quotations.slice(0, 5).map((quote) => `<div><span class="quotation-code">${quote.quotation_code}</span><div><b>${quote.customers?.name || 'Customer'}</b><small>${quote.quotation_items?.map((item) => `${item.description} x ${item.quantity}`).join(' · ') || 'Belum ada item'}</small></div><strong>${formatRupiah(quote.total)}</strong><span class="status status-${quote.status === 'approved' ? 'green' : quote.status === 'sent' ? 'yellow' : 'gray'}">${quote.status}</span>${['draft', 'sent'].includes(quote.status) ? `<button class="text-button convert-quote" data-quotation-id="${quote.id}" title="Jadikan pesanan">Pesan</button>` : ''}<button class="more-button print-quotation" data-quotation-id="${quote.id}" title="Cetak"><svg><use href="#i-more"/></svg></button></div>`).join('');
 const printQuotation = (quote) => {
   const items = quote.quotation_items || [];
   const printWindow = window.open('', '_blank', 'width=900,height=700');
@@ -1012,6 +1014,7 @@ async function loadDatabaseData() {
     $('#quotationList').innerHTML = quotationCache.length ? renderQuotations(quotationCache) : '<div><div><b>Belum ada penawaran</b><small>Buat penawaran pertama ke customer</small></div></div>';
   }
   await reloadPurchaseOrders();
+  await reloadSales();
   const directoryError = await loadContactDirectory();
   const databaseErrors = [['Customer', customerResult], ['Aset', assetResult], ['Maintenance', scheduleResult], ['SPK', workOrderResult], ['Spare part', partsResult], ['Karyawan', employeeResult], ['Quotation', quotationResult]].filter(([, result]) => result.error).map(([name, result]) => `${name}: ${result.error.message}`);
   if (directoryError) databaseErrors.push(`Kontak: ${directoryError.message}`);
@@ -1583,7 +1586,12 @@ const quotationModal = document.createElement('div');
 quotationModal.className = 'modal-backdrop';
 quotationModal.innerHTML = '<div class="modal inventory-modal"><div class="modal-header"><div><p class="eyebrow">QUOTATION</p><h2>Buat penawaran</h2></div><button class="icon-button" id="closeQuotationModal"><svg><use href="#i-close"/></svg></button></div><form id="quotationForm"><label>Customer<select required name="customer" id="quotationCustomerSelect"></select></label><label>Ambil dari database spare part<select name="sparePart" id="quotationPartSelect"><option value="">-- Ketik manual --</option></select></label><label>Deskripsi penawaran<input required name="description" placeholder="Spare part dan jasa maintenance" /></label><div class="quotation-form-grid"><label>Jumlah<input required type="number" min="1" name="quantity" value="1" /></label><label>Harga satuan<input required type="number" min="0" name="unitPrice" placeholder="Rp" /></label><label>Berlaku sampai<input type="date" name="validUntil" /></label></div><div class="modal-actions"><button type="button" class="secondary-button" id="cancelQuotationModal">Batal</button><button class="primary-button" type="submit">Simpan penawaran</button></div></form></div>';
 document.body.append(quotationModal);
-$('#quotationList').addEventListener('click', (event) => { const button = event.target.closest('.print-quotation'); if (button) printQuotation(quotationCache.find((quote) => quote.id === button.dataset.quotationId)); });
+$('#quotationList').addEventListener('click', (event) => {
+  const convert = event.target.closest('.convert-quote');
+  if (convert) { convertQuotationToSO(convert.dataset.quotationId); return; }
+  const button = event.target.closest('.print-quotation');
+  if (button) printQuotation(quotationCache.find((quote) => quote.id === button.dataset.quotationId));
+});
 const closeQuotationModal = () => quotationModal.classList.remove('open');
 $('#createQuotationButton').addEventListener('click', () => {
   $('#quotationCustomerSelect').innerHTML = $$('#customerRows tr').map((row) => `<option value="${row.dataset.customerId}">${row.querySelector('.person b')?.textContent || 'Customer'}</option>`).join('');
@@ -1702,6 +1710,264 @@ applyTwoColumn(maintenanceModal, 560);
 applyTwoColumn(workOrderModal, 560);
 applyTwoColumn(reportModal, 600);
 applyTwoColumn($('#assetModalBackdrop'), 640);
+let soCache = [];
+let deliveryCache = [];
+let invoiceCache = [];
+const soStatusClass = { draft: 'status-gray', confirmed: 'status-yellow', partial: 'status-purple', delivered: 'status-blue', invoiced: 'status-green', cancelled: 'status-gray' };
+const renderSalesOrders = (orders) => orders.slice(0, 8).map((so) => {
+  const items = so.sales_order_items || [];
+  const delivered = items.reduce((sum, item) => sum + Number(item.delivered_qty), 0);
+  const ordered = items.reduce((sum, item) => sum + Number(item.quantity), 0);
+  return `<div><span class="quotation-code">${so.so_code}</span><div><b>${so.customer_name || 'Customer'}</b><small>${items.map((item) => `${item.description} × ${item.quantity}`).join(' · ') || 'Belum ada item'}</small></div><strong>${formatRupiah(so.total)}</strong><span class="status ${soStatusClass[so.status] || 'status-gray'}">${so.status}</span>${['draft', 'confirmed', 'partial'].includes(so.status) ? `<button class="more-button ship-so" data-so-id="${so.id}" title="Buat pengiriman"><svg><use href="#i-more"/></svg></button>` : ''}${isAdmin() && !['delivered', 'invoiced', 'cancelled'].includes(so.status) ? `<button class="icon-button cancel-so" data-so-id="${so.id}" title="Batalkan">✕</button>` : ''}<small>Kirim ${delivered}/${ordered}</small></div>`;
+}).join('');
+const renderDeliveries = (deliveries) => deliveries.slice(0, 8).map((delivery) => {
+  const items = delivery.delivery_items || [];
+  return `<div><span class="quotation-code">${delivery.delivery_code}</span><div><b>${delivery.delivery_date || ''}</b><small>${items.length} jenis barang${delivery.sales_order_id ? ' · dari pesanan' : ''}</small></div><button class="more-button print-delivery" data-delivery-id="${delivery.id}" title="Cetak surat jalan"><svg><use href="#i-more"/></svg></button></div>`;
+}).join('');
+const renderInvoices = (invoices) => invoices.slice(0, 8).map((invoice) => {
+  const paid = (invoice.invoice_payments || []).reduce((sum, payment) => sum + Number(payment.amount), 0);
+  const status = invoice.status === 'paid' ? 'status-green' : invoice.status === 'partial' ? 'status-yellow' : invoice.status === 'cancelled' ? 'status-gray' : 'status-purple';
+  return `<div><span class="quotation-code">${invoice.invoice_code}</span><div><b>${invoice.customer_name || 'Customer'}</b><small>Jatuh tempo: ${invoice.due_date || '-'} · Dibayar ${formatRupiah(paid)} dari ${formatRupiah(invoice.total)}</small></div><strong>${formatRupiah(invoice.total)}</strong><span class="status ${status}">${invoice.status}</span>${!['paid', 'cancelled'].includes(invoice.status) ? `<button class="more-button pay-invoice" data-invoice-id="${invoice.id}" title="Catat pembayaran"><svg><use href="#i-more"/></svg></button>` : ''}${isAdmin() && invoice.status === 'unpaid' ? `<button class="icon-button cancel-invoice" data-invoice-id="${invoice.id}" title="Batalkan">✕</button>` : ''}</div>`;
+}).join('');
+async function reloadSales() {
+  if (!window.crmDb?.ready) return;
+  const [soResult, deliveryResult, invoiceResult] = await Promise.all([window.crmDb.getSalesOrders(), window.crmDb.getDeliveries(), window.crmDb.getInvoices()]);
+  if (!soResult.error && soResult.data) {
+    soCache = soResult.data;
+    if (soCache.length) {
+      $('#salesOrderList').innerHTML = renderSalesOrders(soCache);
+      $('#salesOrderCount').textContent = `${soCache.length} pesanan tercatat`;
+    }
+  }
+  if (!deliveryResult.error && deliveryResult.data?.length) {
+    deliveryCache = deliveryResult.data;
+    $('#deliveryList').innerHTML = renderDeliveries(deliveryCache);
+  }
+  if (!invoiceResult.error && invoiceResult.data) {
+    invoiceCache = invoiceResult.data;
+    if (invoiceCache.length) {
+      $('#invoiceList').innerHTML = renderInvoices(invoiceCache);
+      $('#invoiceCount').textContent = `${invoiceCache.length} faktur tercatat`;
+    }
+  }
+}
+const soModal = document.createElement('div');
+soModal.className = 'modal-backdrop';
+soModal.innerHTML = '<div class="modal relation-modal"><div class="modal-header"><div><p class="eyebrow">PENJUALAN</p><h2>Buat pesanan penjualan</h2></div><button class="icon-button" id="closeSOModal"><svg><use href="#i-close"/></svg></button></div><form id="soForm"><label>Customer<select required name="customer" id="soCustomerSelect"></select></label><label>Catatan<input name="notes" placeholder="Catatan pesanan" /></label><div class="detail-section-heading"><h3>Item barang</h3><button type="button" class="text-button" id="addSOItemButton">+ Tambah baris</button></div><div id="soItemRows"></div><div class="modal-actions"><button type="button" class="secondary-button" id="cancelSOModal">Batal</button><button class="primary-button" type="submit">Simpan pesanan</button></div></form></div>';
+document.body.append(soModal);
+applyTwoColumn(soModal, 720);
+const closeSOModal = () => soModal.classList.remove('open');
+$('#closeSOModal').addEventListener('click', closeSOModal);
+$('#cancelSOModal').addEventListener('click', closeSOModal);
+soModal.addEventListener('click', (event) => { if (event.target === soModal) closeSOModal(); });
+const soItemRow = (preset) => {
+  const row = document.createElement('div');
+  row.className = 'unit-conv-row';
+  row.innerHTML = `<select name="soPart" style="grid-column:1/-1">${partCache.map((part) => `<option value="${part.spare_part_id}"${preset && String(preset.spare_part_id) === String(part.spare_part_id) ? ' selected' : ''}>${part.part_code} · ${part.name}</option>`).join('')}</select><input type="number" name="soQty" min="0.01" step="any" placeholder="Qty" value="${preset?.quantity || 1}" /><input type="number" name="soPrice" min="0" placeholder="Harga Rp" value="${preset?.unit_price || ''}" /><button type="button" class="icon-button remove-unit-row" title="Hapus">✕</button>`;
+  row.querySelector('.remove-unit-row').addEventListener('click', () => row.remove());
+  const partSelect = row.querySelector('select[name="soPart"]');
+  partSelect.addEventListener('change', () => { const part = partCache.find((item) => String(item.spare_part_id) === partSelect.value); if (part?.list_price) row.querySelector('input[name="soPrice"]').value = part.list_price; });
+  return row;
+};
+$('#addSOItemButton').addEventListener('click', () => $('#soItemRows').append(soItemRow()));
+$('#addSalesOrderButton').addEventListener('click', () => {
+  $('#soCustomerSelect').innerHTML = $$('#customerRows tr').map((row) => `<option value="${row.dataset.customerId}">${row.querySelector('.person b')?.textContent || 'Customer'}</option>`).join('');
+  $('#soItemRows').innerHTML = '';
+  $('#soItemRows').append(soItemRow());
+  soModal.classList.add('open');
+});
+$('#soForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = new FormData(event.target);
+  if (String(form.get('customer')).startsWith('demo-')) { showToast('Customer demo belum memiliki ID database.', true); return; }
+  const customerName = $('#soCustomerSelect').selectedOptions[0]?.textContent || null;
+  const so = await window.crmDb.createSalesOrder({ customer_id: form.get('customer'), customer_name: customerName, notes: form.get('notes') || null });
+  if (so.error) { showToast(`Pesanan belum tersimpan: ${so.error.message}`, true); return; }
+  const rows = $$('#soItemRows .unit-conv-row').map((row) => {
+    const part = partCache.find((item) => String(item.spare_part_id) === row.querySelector('select[name="soPart"]').value);
+    return { sales_order_id: so.data.id, spare_part_id: part?.spare_part_id || null, description: part ? `${part.part_code} · ${part.name}` : 'Item', quantity: Number(row.querySelector('input[name="soQty"]').value) || 0, unit: part?.unit || 'pcs', unit_price: Number(row.querySelector('input[name="soPrice"]').value) || 0 };
+  }).filter((row) => row.quantity > 0);
+  if (!rows.length) { showToast('Tambahkan minimal satu item.', true); return; }
+  const items = await window.crmDb.createSalesOrderItems(rows);
+  if (items.error) { showToast(`Pesanan tersimpan, tetapi item gagal: ${items.error.message}`, true); return; }
+  event.target.reset();
+  $('#soItemRows').innerHTML = '';
+  closeSOModal();
+  showToast('Pesanan penjualan tersimpan.');
+  await reloadSales();
+});
+async function convertQuotationToSO(quotationId) {
+  const quote = quotationCache.find((item) => String(item.id) === String(quotationId));
+  if (!quote) return;
+  const customerRow = [...$$('#customerRows tr')].find((row) => row.querySelector('.person b')?.textContent === quote.customers?.name);
+  const customerId = customerRow?.dataset.customerId;
+  if (!customerId || customerId.startsWith('demo-')) { showToast('Customer penawaran belum ada di database.', true); return; }
+  const so = await window.crmDb.createSalesOrder({ customer_id: customerId, customer_name: quote.customers?.name, quotation_id: quote.id, notes: `Dari penawaran ${quote.quotation_code}` });
+  if (so.error) { showToast(`Gagal membuat pesanan: ${so.error.message}`, true); return; }
+  const items = (quote.quotation_items || []).map((item) => ({ sales_order_id: so.data.id, spare_part_id: item.spare_part_id, description: item.description, quantity: item.quantity, unit: item.unit || 'pcs', unit_price: item.unit_price, discount: item.discount || 0 }));
+  if (items.length) await window.crmDb.createSalesOrderItems(items);
+  await window.crmDb.updateQuotation(quote.id, { status: 'approved' });
+  showToast(`Penawaran ${quote.quotation_code} menjadi pesanan ${so.data.so_code}.`);
+  const refreshed = await window.crmDb.getQuotations();
+  if (!refreshed.error) { quotationCache = refreshed.data || []; $('#quotationList').innerHTML = renderQuotations(quotationCache); }
+  await reloadSales();
+}
+const deliveryModal = document.createElement('div');
+deliveryModal.className = 'modal-backdrop';
+deliveryModal.innerHTML = '<div class="modal relation-modal"><div class="modal-header"><div><p class="eyebrow">PENGIRIMAN</p><h2>Buat surat jalan</h2></div><button class="icon-button" id="closeDeliveryModal"><svg><use href="#i-close"/></svg></button></div><form id="deliveryForm"><label>Pesanan penjualan<select name="so" id="deliverySOSelect"></select></label><label>Gudang pengirim<select required name="warehouse" id="deliveryWarehouseSelect"></select></label><label>Tanggal kirim<input type="date" name="deliveryDate" /></label><div class="detail-section-heading"><h3>Item dikirim</h3></div><div id="deliveryItemRows"></div><div class="modal-actions"><button type="button" class="secondary-button" id="cancelDeliveryModal">Batal</button><button class="primary-button" type="submit">Simpan pengiriman</button></div></form></div>';
+document.body.append(deliveryModal);
+applyTwoColumn(deliveryModal, 720);
+const closeDeliveryModal = () => deliveryModal.classList.remove('open');
+$('#closeDeliveryModal').addEventListener('click', closeDeliveryModal);
+$('#cancelDeliveryModal').addEventListener('click', closeDeliveryModal);
+deliveryModal.addEventListener('click', (event) => { if (event.target === deliveryModal) closeDeliveryModal(); });
+async function openDeliveryModal(soId) {
+  await reloadSales();
+  const openSOs = soCache.filter((so) => ['draft', 'confirmed', 'partial'].includes(so.status));
+  $('#deliverySOSelect').innerHTML = openSOs.map((so) => `<option value="${so.id}"${String(so.id) === String(soId) ? ' selected' : ''}>${so.so_code} · ${so.customer_name || ''}</option>`).join('') || '<option value="">Belum ada pesanan terbuka</option>';
+  const warehouses = await window.crmDb.getWarehouses();
+  $('#deliveryWarehouseSelect').innerHTML = (warehouses.data || []).map((w) => `<option value="${w.id}">${w.name}</option>`).join('');
+  renderDeliveryItems();
+  $('#deliverySOSelect').onchange = renderDeliveryItems;
+  deliveryModal.classList.add('open');
+}
+function renderDeliveryItems() {
+  const so = soCache.find((item) => String(item.id) === String($('#deliverySOSelect').value));
+  $('#deliveryItemRows').innerHTML = so
+    ? (so.sales_order_items || []).map((item) => {
+      const remaining = Number(item.quantity) - Number(item.delivered_qty);
+      return `<div class="unit-conv-row" data-so-item="${item.id}" data-part="${item.spare_part_id || ''}"><span style="grid-column:1/-1"><b>${item.description}</b> <small>Sisa ${remaining} dari ${item.quantity}</small></span><input type="number" name="deliveryQty" min="0" step="any" placeholder="Qty kirim" value="${remaining > 0 ? remaining : 0}" /><span></span><span></span></div>`;
+    }).join('')
+    : '<div class="detail-pic"><div><b>Pilih pesanan</b></div></div>';
+}
+$('#createDeliveryButton').addEventListener('click', () => openDeliveryModal());
+$('#deliveryForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = new FormData(event.target);
+  const soId = form.get('so') || null;
+  if (!form.get('warehouse')) { showToast('Pilih gudang pengirim.', true); return; }
+  const rows = $$('#deliveryItemRows .unit-conv-row').map((row) => ({ soItemId: row.dataset.soItem || null, partId: row.dataset.part || null, qty: Number(row.querySelector('input[name="deliveryQty"]')?.value) || 0 })).filter((row) => row.partId && row.qty > 0);
+  if (!rows.length) { showToast('Isi qty kirim minimal satu baris.', true); return; }
+  const so = soCache.find((item) => String(item.id) === String(soId));
+  const delivery = await window.crmDb.createDelivery({ sales_order_id: soId, customer_id: so?.customer_id || null, warehouse_id: form.get('warehouse'), delivery_date: form.get('deliveryDate') || null });
+  if (delivery.error) { showToast(`Pengiriman gagal: ${delivery.error.message}`, true); return; }
+  await window.crmDb.createDeliveryItems(rows.map((row) => ({ delivery_id: delivery.data.id, sales_order_item_id: row.soItemId, spare_part_id: row.partId, quantity: row.qty })));
+  for (const row of rows) {
+    await window.crmDb.createInventoryMovement({ spare_part_id: row.partId, warehouse_id: form.get('warehouse'), movement_type: 'outbound', quantity: row.qty, unit_cost: 0, reference_type: 'sales_delivery', reference_id: delivery.data.id, notes: `Pengiriman ${delivery.data.delivery_code}` });
+    if (row.soItemId && so) {
+      const soItem = so.sales_order_items.find((item) => String(item.id) === String(row.soItemId));
+      if (soItem) await window.crmDb.updateSalesOrderItem(row.soItemId, { delivered_qty: Number(soItem.delivered_qty) + row.qty });
+    }
+  }
+  if (soId) {
+    const updated = (await window.crmDb.getSalesOrders()).data?.find((item) => String(item.id) === String(soId));
+    if (updated) {
+      const allDelivered = (updated.sales_order_items || []).every((item) => Number(item.delivered_qty) >= Number(item.quantity));
+      await window.crmDb.updateSalesOrder(soId, { status: allDelivered ? 'delivered' : 'partial' });
+    }
+  }
+  closeDeliveryModal();
+  showToast('Pengiriman tersimpan, stok berkurang.');
+  await reloadSales();
+});
+const invoiceModal = document.createElement('div');
+invoiceModal.className = 'modal-backdrop';
+invoiceModal.innerHTML = '<div class="modal relation-modal"><div class="modal-header"><div><p class="eyebrow">FAKTUR PENJUALAN</p><h2>Buat faktur</h2></div><button class="icon-button" id="closeInvoiceModal"><svg><use href="#i-close"/></svg></button></div><form id="invoiceForm"><label>Pesanan penjualan<select name="so" id="invoiceSOSelect"></select></label><label>Jatuh tempo<input type="date" name="dueDate" /></label><label>Catatan<input name="notes" placeholder="Catatan faktur" /></label><div class="customer-contact-list" id="invoiceSummary"></div><div class="modal-actions"><button type="button" class="secondary-button" id="cancelInvoiceModal">Batal</button><button class="primary-button" type="submit">Simpan faktur</button></div></form></div>';
+document.body.append(invoiceModal);
+applyTwoColumn(invoiceModal, 680);
+const closeInvoiceModal = () => invoiceModal.classList.remove('open');
+$('#closeInvoiceModal').addEventListener('click', closeInvoiceModal);
+$('#cancelInvoiceModal').addEventListener('click', closeInvoiceModal);
+invoiceModal.addEventListener('click', (event) => { if (event.target === invoiceModal) closeInvoiceModal(); });
+async function openInvoiceModal() {
+  await reloadSales();
+  const billable = soCache.filter((so) => ['confirmed', 'partial', 'delivered'].includes(so.status));
+  $('#invoiceSOSelect').innerHTML = billable.map((so) => `<option value="${so.id}">${so.so_code} · ${so.customer_name || ''} · ${formatRupiah(so.total)}</option>`).join('') || '<option value="">Belum ada pesanan</option>';
+  const paint = () => {
+    const so = soCache.find((item) => String(item.id) === String($('#invoiceSOSelect').value));
+    $('#invoiceSummary').innerHTML = so ? `<div class="detail-pic"><div><b>${so.so_code}</b><small>Subtotal ${formatRupiah(so.subtotal)} · PPN ${formatRupiah(so.tax)} · Total ${formatRupiah(so.total)}</small></div></div>` : '';
+  };
+  $('#invoiceSOSelect').onchange = paint;
+  paint();
+  invoiceModal.classList.add('open');
+}
+$('#createInvoiceButton').addEventListener('click', openInvoiceModal);
+$('#invoiceForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = new FormData(event.target);
+  const so = soCache.find((item) => String(item.id) === String(form.get('so')));
+  if (!so) { showToast('Pilih pesanan terlebih dahulu.', true); return; }
+  const invoice = await window.crmDb.createInvoice({ sales_order_id: so.id, customer_id: so.customer_id, customer_name: so.customer_name, due_date: form.get('dueDate') || null, notes: form.get('notes') || null, subtotal: so.subtotal, discount: so.discount, tax: so.tax, total: so.total });
+  if (invoice.error) { showToast(`Faktur gagal: ${invoice.error.message}`, true); return; }
+  await window.crmDb.updateSalesOrder(so.id, { status: 'invoiced' });
+  closeInvoiceModal();
+  showToast(`Faktur ${invoice.data.invoice_code} tersimpan.`);
+  await reloadSales();
+});
+const paymentModal = document.createElement('div');
+paymentModal.className = 'modal-backdrop';
+paymentModal.innerHTML = '<div class="modal relation-modal"><div class="modal-header"><div><p class="eyebrow">PEMBAYARAN</p><h2 id="paymentTitle">Catat pembayaran</h2></div><button class="icon-button" id="closePaymentModal"><svg><use href="#i-close"/></svg></button></div><form id="paymentForm"><label>Jumlah bayar (Rp)<input required type="number" min="0.01" step="any" name="amount" placeholder="Rp" /></label><label>Tanggal bayar<input type="date" name="paidDate" /></label><label>Metode<input name="method" placeholder="Transfer / Tunai / Giro" /></label><label>Catatan<input name="notes" placeholder="Keterangan" /></label><div class="modal-actions"><button type="button" class="secondary-button" id="cancelPaymentModal">Batal</button><button class="primary-button" type="submit">Simpan</button></div></form></div>';
+document.body.append(paymentModal);
+applyTwoColumn(paymentModal, 560);
+const closePaymentModal = () => paymentModal.classList.remove('open');
+$('#closePaymentModal').addEventListener('click', closePaymentModal);
+$('#cancelPaymentModal').addEventListener('click', closePaymentModal);
+paymentModal.addEventListener('click', (event) => { if (event.target === paymentModal) closePaymentModal(); });
+let activeInvoiceId = null;
+async function openPaymentModal(invoiceId) {
+  activeInvoiceId = invoiceId;
+  const invoice = invoiceCache.find((item) => String(item.id) === String(invoiceId));
+  const paid = (invoice?.invoice_payments || []).reduce((sum, payment) => sum + Number(payment.amount), 0);
+  $('#paymentTitle').textContent = `Bayar ${invoice?.invoice_code || ''} (sisa ${formatRupiah(Number(invoice?.total) - paid)})`;
+  paymentModal.classList.add('open');
+}
+$('#paymentForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = new FormData(event.target);
+  const result = await window.crmDb.createPayment({ invoice_id: activeInvoiceId, amount: Number(form.get('amount')), paid_date: form.get('paidDate') || null, method: form.get('method') || null, notes: form.get('notes') || null });
+  if (result.error) { showToast(`Pembayaran gagal: ${result.error.message}`, true); return; }
+  const invoices = await window.crmDb.getInvoices();
+  const invoice = invoices.data?.find((item) => String(item.id) === String(activeInvoiceId));
+  if (invoice) {
+    const paid = (invoice.invoice_payments || []).reduce((sum, payment) => sum + Number(payment.amount), 0);
+    await window.crmDb.updateInvoice(activeInvoiceId, { status: paid >= Number(invoice.total) ? 'paid' : 'partial' });
+  }
+  event.target.reset();
+  closePaymentModal();
+  showToast('Pembayaran tercatat.');
+  await reloadSales();
+});
+$('#salesOrderList').addEventListener('click', async (event) => {
+  const ship = event.target.closest('.ship-so');
+  if (ship) { openDeliveryModal(ship.dataset.soId); return; }
+  const cancel = event.target.closest('.cancel-so');
+  if (cancel && window.confirm('Batalkan pesanan ini?')) {
+    const result = await window.crmDb.updateSalesOrder(cancel.dataset.soId, { status: 'cancelled' });
+    if (result.error) showToast(`Gagal membatalkan: ${result.error.message}`, true);
+    else { showToast('Pesanan dibatalkan.'); await reloadSales(); }
+  }
+});
+$('#invoiceList').addEventListener('click', async (event) => {
+  const pay = event.target.closest('.pay-invoice');
+  if (pay) { openPaymentModal(pay.dataset.invoiceId); return; }
+  const cancel = event.target.closest('.cancel-invoice');
+  if (cancel && window.confirm('Batalkan faktur ini?')) {
+    const result = await window.crmDb.updateInvoice(cancel.dataset.invoiceId, { status: 'cancelled' });
+    if (result.error) showToast(`Gagal membatalkan: ${result.error.message}`, true);
+    else { showToast('Faktur dibatalkan.'); await reloadSales(); }
+  }
+});
+$('#deliveryList').addEventListener('click', (event) => {
+  const button = event.target.closest('.print-delivery');
+  if (!button) return;
+  const delivery = deliveryCache.find((item) => String(item.id) === String(button.dataset.deliveryId));
+  if (!delivery) return;
+  const items = delivery.delivery_items || [];
+  const printWindow = window.open('', '_blank', 'width=900,height=700');
+  if (!printWindow) return;
+  printWindow.document.write(`<title>${delivery.delivery_code}</title><style>body{font:14px Arial;color:#182235;max-width:800px;margin:40px auto}h1{margin-bottom:4px}table{width:100%;border-collapse:collapse;margin-top:28px}th,td{padding:10px;border-bottom:1px solid #ddd;text-align:left}</style><h1>Surat Jalan ${delivery.delivery_code}</h1><p>Tanggal: ${delivery.delivery_date || '-'}</p><table><thead><tr><th>Barang</th><th>Qty</th></tr></thead><tbody>${items.map((item) => `<tr><td>${item.spare_part_id}</td><td>${item.quantity}</td></tr>`).join('')}</tbody></table>`);
+  printWindow.document.close(); printWindow.focus(); printWindow.print();
+});
 let poCache = [];
 const poStatusClass = { draft: 'status-gray', sent: 'status-yellow', partial: 'status-purple', received: 'status-green', cancelled: 'status-gray' };
 const renderPurchaseOrders = (orders) => orders.slice(0, 5).map((po) => {
