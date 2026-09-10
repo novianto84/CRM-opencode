@@ -12,13 +12,13 @@ const applyTwoColumn = (modalEl, boxWidth) => {
   const narrow = window.matchMedia && window.matchMedia('(max-width:600px)').matches;
   const box = modalEl.querySelector('.modal');
   if (box) { box.style.width = `min(100%,${narrow ? 440 : boxWidth}px)`; box.style.maxHeight = '90vh'; box.style.overflowY = 'auto'; }
-  const grid = modalEl.querySelector('form .customer-form-grid, form .employee-form-grid') || modalEl.querySelector('form');
+  const grid = modalEl.querySelector('form .customer-form-grid, form .employee-form-grid, form .part-form-grid, form .quotation-form-grid, form .stock-form-grid, form .maintenance-form-grid, form .workorder-form-grid, form .asset-form-grid, form .report-form-grid') || modalEl.querySelector('form');
   if (!grid) return;
   if (narrow) { grid.style.display = ''; grid.style.gridTemplateColumns = ''; grid.style.gap = ''; return; }
   grid.style.display = 'grid';
   grid.style.gridTemplateColumns = '1fr 1fr';
   grid.style.gap = '0 15px';
-  grid.querySelectorAll(':scope > .modal-actions, :scope > .detail-section-heading, :scope > .customer-contact-list, :scope > .company-logo').forEach((el) => { el.style.gridColumn = '1/-1'; });
+  grid.querySelectorAll(':scope > .modal-actions, :scope > .detail-section-heading, :scope > .customer-contact-list, :scope > .company-logo, :scope > .part-full').forEach((el) => { el.style.gridColumn = '1/-1'; });
   modalEl.querySelectorAll('textarea, input[name="address"], input[name="contactAddress"]').forEach((el) => { const label = el.closest('label'); if (label) label.style.gridColumn = '1/-1'; });
   const existing = modalEl.querySelector('#relationExistingLabel');
   if (existing) existing.style.gridColumn = '1/-1';
@@ -1174,7 +1174,7 @@ $('#addUnitRowButton').addEventListener('click', () => {
   row.querySelector('.remove-unit-row').addEventListener('click', () => row.remove());
   $('#unitConversionRows').append(row);
 });
-$('#addPartButton').addEventListener('click', async () => { await refreshPartMasters(); partModal.classList.add('open'); });
+$('#addPartButton').addEventListener('click', async () => { await refreshPartMasters(); applyTwoColumn(partModal, 660); partModal.classList.add('open'); });
 $('#closePartModal').addEventListener('click', closePartModal);
 $('#cancelPartModal').addEventListener('click', closePartModal);
 partModal.addEventListener('click', (event) => { if (event.target === partModal) closePartModal(); });
@@ -1418,3 +1418,10 @@ $('#stockForm').addEventListener('submit', async (event) => {
   event.target.reset();
   closeStockModal();
 });
+applyTwoColumn(partModal, 660);
+applyTwoColumn(quotationModal, 560);
+applyTwoColumn(stockModal, 560);
+applyTwoColumn(maintenanceModal, 560);
+applyTwoColumn(workOrderModal, 560);
+applyTwoColumn(reportModal, 600);
+applyTwoColumn($('#assetModalBackdrop'), 640);
