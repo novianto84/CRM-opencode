@@ -169,6 +169,18 @@
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('spare_parts').insert(payload).select().single();
     },
+    async updateSparePart(id, payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('spare_parts').update(payload).eq('id', id).select().single();
+    },
+    async getVendorPrices(sparePartId) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('spare_part_vendor_prices').select('*').eq('spare_part_id', sparePartId).order('created_at', { ascending: false }).limit(50);
+    },
+    async createVendorPrice(payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('spare_part_vendor_prices').insert(payload).select().single();
+    },
     async createInventoryMovement(payload) {
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('inventory_movements').insert(payload).select().single();

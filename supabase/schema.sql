@@ -229,12 +229,30 @@ create table public.spare_parts (
   stock_quantity numeric(12, 2) not null default 0,
   minimum_stock numeric(12, 2) not null default 0,
   unit_cost numeric(14, 2) not null default 0,
+  weight_kg numeric(12, 3),
+  length_cm numeric(12, 2),
+  width_cm numeric(12, 2),
+  height_cm numeric(12, 2),
+  list_price numeric(14, 2) not null default 0,
+  last_purchase_price numeric(14, 2),
+  last_purchase_date date,
   is_active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   check (stock_quantity >= 0),
   check (minimum_stock >= 0),
   check (unit_cost >= 0)
+);
+
+create table public.spare_part_vendor_prices (
+  id uuid primary key default gen_random_uuid(),
+  spare_part_id uuid not null references public.spare_parts(id) on delete cascade,
+  vendor_name text not null,
+  offered_price numeric(14, 2) not null check (offered_price >= 0),
+  valid_until date,
+  notes text,
+  recorded_by uuid references public.employees(id) on delete set null,
+  created_at timestamptz not null default now()
 );
 
 create table public.maintenance_parts (
@@ -330,7 +348,7 @@ begin
   foreach table_name in array array[
     'employees', 'customers', 'customer_locations', 'contacts', 'customer_contacts', 'assets',
     'asset_ownership_history', 'maintenance_schedules', 'work_orders',
-    'maintenance_records', 'spare_parts', 'maintenance_parts', 'audit_logs'
+    'maintenance_records', 'spare_parts', 'spare_part_vendor_prices', 'maintenance_parts', 'audit_logs'
   ] loop
     execute format('alter table public.%I enable row level security', table_name);
     execute format('drop policy if exists authenticated_full_access on public.%I', table_name);
