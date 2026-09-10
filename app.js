@@ -2694,12 +2694,18 @@ vendorMasterModal.addEventListener('click', async (event) => {
 $('#vendorMasterForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = new FormData(event.target);
-  const result = await window.crmDb.createVendor({ name: form.get('name'), phone: form.get('phone') || null, email: form.get('email') || null, address: form.get('address') || null });
-  if (result.error) { showToast(`Pemasok belum tersimpan: ${result.error.message}`, true); return; }
-  event.target.reset();
-  showToast('Pemasok tersimpan.');
-  await refreshVendorMaster();
-  await reloadVendorDirectory();
+  const name = String(form.get('name') || '').trim();
+  if (!name) { showToast('Isi nama pemasok.', true); return; }
+  try {
+    const result = await window.crmDb.createVendor({ name, phone: form.get('phone') || null, email: form.get('email') || null, address: form.get('address') || null });
+    if (result.error) { showToast(`Pemasok belum tersimpan: ${result.error.message}`, true); return; }
+    event.target.reset();
+    showToast('Pemasok tersimpan.');
+    await refreshVendorMaster();
+    await reloadVendorDirectory();
+  } catch (err) {
+    showToast(`Pemasok belum tersimpan: ${err?.message || err}`, true);
+  }
 });
 $('#vendorMasterButton').addEventListener('click', async () => { await refreshVendorMaster(); vendorMasterModal.classList.add('open'); });
 async function reloadVendorDirectory() {
@@ -2732,4 +2738,8 @@ $('#vendorDirectorySearch').addEventListener('input', (event) => {
   const query = event.target.value.toLowerCase();
   $$('#vendorDirectoryRows tr').forEach((row) => { row.hidden = !row.textContent.toLowerCase().includes(query); });
 });
-$('#addVendorPageButton').addEventListener('click', async () => { await refreshVendorMaster(); vendorMasterModal.classList.add('open'); });
+$('#addVendorPageButton').addEventListener('click', async () => {
+  vendorMasterModal.classList.add('open');
+  try { await refreshVendorMaster(); }
+  catch (err) { showToast(`Daftar pemasok gagal dimuat: ${err?.message || err}`, true); }
+});
