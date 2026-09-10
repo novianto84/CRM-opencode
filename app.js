@@ -122,6 +122,16 @@ const renderPlainContactRows = (contacts) => contacts.map((contact) => {
   const initials = name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
   return `<tr data-contact-id="${contact.id}"><td><div class="person"><div class="avatar avatar-blue"${contact.photo_url ? ` style="background-image:url('${contact.photo_url}');background-size:cover;color:transparent"` : ''}>${initials}</div><div><b>${name}</b><small>${contact.email || contact.email2 || contact.phone || contact.phone2 || '-'}</small></div></div></td><td><span class="status status-blue">PIC</span></td><td>-</td><td>${contact.phone || '-'}</td><td><b>${contact.position || '-'}</b></td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`;
 }).join('');
+function refreshInventoryMetrics() {
+  const cards = $$('.inventory-metrics .inventory-metric b');
+  if (cards.length < 4 || !partCache.length) return;
+  const low = partCache.filter((part) => (Number(part.stock_on_hand) || 0) <= (Number(part.minimum_stock) || 0)).length;
+  const value = partCache.reduce((sum, part) => sum + (Number(part.stock_on_hand) || 0) * (Number(part.last_purchase_price) || 0), 0);
+  cards[0].textContent = `${partCache.length}`;
+  cards[1].textContent = `${partCache.length - low} part`;
+  cards[2].textContent = `${low} part`;
+  cards[3].textContent = formatRupiah(value);
+}
 function paintContactTables(html, count) {
   $('#contactRows').innerHTML = html;
   const directoryRows = $('#contactDirectoryRows');
@@ -985,6 +995,7 @@ async function loadDatabaseData() {
     $('#partRows').innerHTML = renderDbPartRows(partsResult.data);
     $('#partCount').textContent = `${partsResult.data.length} dari ${partsResult.data.length}`;
     bindPartRowButtons();
+    refreshInventoryMetrics();
   }
   if (!employeeResult.error && employeeResult.data?.length) {
     $('#employeeRows').innerHTML = renderDbEmployeeRows(employeeResult.data);
@@ -1234,6 +1245,7 @@ $('#partForm').addEventListener('submit', async (event) => {
   row.innerHTML = `<td><span class="part-code">${form.get('partCode')}</span></td><td><b>${form.get('name')}</b><small>${form.get('unit')}</small></td><td>${form.get('category') || '-'}</td><td>${form.get('compatibleModels') || '-'}</td><td><strong>0 ${form.get('unit')}</strong></td><td>${form.get('minimumStock')} ${form.get('unit')}</td><td>${form.get('listPrice') ? formatRupiah(form.get('listPrice')) : 'Belum diatur'}</td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td>`;
   $('#partRows').prepend(row);
   bindPartRowButtons();
+  refreshInventoryMetrics();
   $('#partCount').textContent = `${$('#partRows tr').length} dari 248`;
   event.target.reset();
   $('#unitConversionRows').innerHTML = '';
@@ -1250,7 +1262,7 @@ function bindPartRowButtons() {
 let activeVendorPartId = null;
 const vendorModal = document.createElement('div');
 vendorModal.className = 'modal-backdrop';
-vendorModal.innerHTML = '<div class="modal relation-modal"><div class="modal-header"><div><p class="eyebrow">HARGA VENDOR</p><h2 id="vendorTitle">Penawaran vendor</h2></div><button class="icon-button" id="closeVendorModal"><svg><use href="#i-close"/></svg></button></div><div class="company-logo" id="vendorPartDetail"></div><div class="customer-contact-list" id="vendorPriceList"></div><form id="vendorPriceForm"><div class="quotation-form-grid"><label>Nama vendor<input required name="vendor" placeholder="Nama vendor" /></label><label>Harga penawaran (Rp)<input required type="number" min="0" name="price" placeholder="Rp" /></label><label>Berlaku sampai<input type="date" name="validUntil" /></label></div><label>Catatan<input name="notes" placeholder="Syarat atau catatan vendor" /></label><div class="modal-actions"><button type="button" class="secondary-button" id="cancelVendorModal">Batal</button><button class="primary-button" type="submit">Simpan penawaran</button></div></form></div>';
+vendorModal.innerHTML = '<div class="modal relation-modal"><div class="modal-header"><div><p class="eyebrow">HARGA VENDOR</p><h2 id="vendorTitle">Penawaran vendor</h2></div><button class="icon-button" id="closeVendorModal"><svg><use href="#i-close"/></svg></button></div><div class="company-logo" id="vendorPartDetail"></div><div class="customer-contact-list" id="vendorPriceList"></div><form id="vendorPriceForm"><datalist id="vendorDatalist"></datalist><div class="quotation-form-grid"><label>Nama vendor<input required name="vendor" list="vendorDatalist" placeholder="Nama vendor" /></label><label>Harga penawaran (Rp)<input required type="number" min="0" name="price" placeholder="Rp" /></label><label>Berlaku sampai<input type="date" name="validUntil" /></label></div><label>Catatan<input name="notes" placeholder="Syarat atau catatan vendor" /></label><div class="modal-actions"><button type="button" class="secondary-button" id="cancelVendorModal">Batal</button><button class="primary-button" type="submit">Simpan penawaran</button></div></form></div>';
 document.body.append(vendorModal);
 applyTwoColumn(vendorModal, 680);
 const closeVendorModal = () => vendorModal.classList.remove('open');
@@ -1291,7 +1303,16 @@ $('#vendorPriceForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   if (!activeVendorPartId) return;
   const form = new FormData(event.target);
-  const result = await window.crmDb.createVendorPrice({ spare_part_id: activeVendorPartId, vendor_name: form.get('vendor'), offered_price: Number(form.get('price')), valid_until: form.get('validUntil') || null, notes: form.get('notes') || null });
+  const vendorName = String(form.get('vendor') || '').trim();
+  let vendorId = null;
+  const vendorLookup = await window.crmDb.getVendors();
+  const foundVendor = vendorLookup.data?.find((vendor) => vendor.name.toLowerCase() === vendorName.toLowerCase());
+  if (foundVendor) vendorId = foundVendor.id;
+  else if (vendorName) {
+    const createdVendor = await window.crmDb.createVendor({ name: vendorName });
+    if (!createdVendor.error) vendorId = createdVendor.data.id;
+  }
+  const result = await window.crmDb.createVendorPrice({ spare_part_id: activeVendorPartId, vendor_id: vendorId, vendor_name: vendorName, offered_price: Number(form.get('price')), valid_until: form.get('validUntil') || null, notes: form.get('notes') || null });
   if (result.error) { showToast(`Penawaran vendor belum tersimpan: ${result.error.message}`, true); return; }
   event.target.reset();
   showToast('Penawaran vendor tersimpan.');
@@ -1393,16 +1414,23 @@ $('#quotationForm').addEventListener('submit', async (event) => {
 
 const stockModal = document.createElement('div');
 stockModal.className = 'modal-backdrop';
-stockModal.innerHTML = '<div class="modal inventory-modal"><div class="modal-header"><div><p class="eyebrow">INVENTORY MOVEMENT</p><h2>Catat stok masuk</h2></div><button class="icon-button" id="closeStockModal"><svg><use href="#i-close"/></svg></button></div><form id="stockForm"><label>Spare part<select required name="part" id="stockPartSelect"></select></label><label>Gudang<select required name="warehouse" id="stockWarehouseSelect"></select></label><div class="stock-form-grid"><label>Jenis transaksi<select name="movementType"><option value="inbound">Stok masuk</option><option value="adjustment">Adjustment</option></select></label><label>Jumlah<input required type="number" min="0.01" step="0.01" name="quantity" placeholder="Contoh: 20" /></label><label>Harga satuan<input type="number" min="0" name="unitCost" placeholder="Rp" /></label><label>Catatan<input name="notes" placeholder="Supplier / alasan adjustment" /></label></div><div class="modal-actions"><button type="button" class="secondary-button" id="cancelStockModal">Batal</button><button class="primary-button" type="submit">Simpan pergerakan</button></div></form></div>';
+stockModal.innerHTML = '<div class="modal inventory-modal"><div class="modal-header"><div><p class="eyebrow">INVENTORY MOVEMENT</p><h2>Catat stok masuk</h2></div><button class="icon-button" id="closeStockModal"><svg><use href="#i-close"/></svg></button></div><form id="stockForm"><label>Spare part<select required name="part" id="stockPartSelect"></select></label><label>Gudang<select required name="warehouse" id="stockWarehouseSelect"></select></label><label id="stockDestLabel" hidden>Gudang tujuan<select name="destWarehouse" id="stockDestSelect"></select></label><div class="stock-form-grid"><label>Jenis transaksi<select name="movementType" id="stockMovementType"><option value="inbound">Stok masuk</option><option value="adjustment">Adjustment</option><option value="transfer">Transfer antar gudang</option></select></label><label>Jumlah<input required type="number" min="0.01" step="0.01" name="quantity" placeholder="Contoh: 20" /></label><label>Harga satuan<input type="number" min="0" name="unitCost" placeholder="Rp" /></label><label>Catatan<input name="notes" placeholder="Supplier / alasan adjustment" /></label></div><div class="modal-actions"><button type="button" class="secondary-button" id="cancelStockModal">Batal</button><button class="primary-button" type="submit">Simpan pergerakan</button></div></form></div>';
 document.body.append(stockModal);
 const closeStockModal = () => stockModal.classList.remove('open');
 const refreshStockOptions = async () => {
   $('#stockPartSelect').innerHTML = $$('#partRows tr').map((row) => `<option value="${row.dataset.sparePartId || ''}">${row.querySelector('.part-code')?.textContent || 'Spare part'}</option>`).filter((option) => !option.includes('value=""')).join('');
   if (window.crmDb?.ready) {
     const result = await window.crmDb.getWarehouses();
-    $('#stockWarehouseSelect').innerHTML = result.data?.map((warehouse) => `<option value="${warehouse.id}">${warehouse.name}</option>`).join('') || '<option value="">Migration gudang belum dijalankan</option>';
+    const options = result.data?.map((warehouse) => `<option value="${warehouse.id}">${warehouse.name}</option>`).join('') || '<option value="">Migration gudang belum dijalankan</option>';
+    $('#stockWarehouseSelect').innerHTML = options;
+    $('#stockDestSelect').innerHTML = options;
   } else $('#stockWarehouseSelect').innerHTML = '<option value="">Demo warehouse</option>';
 };
+$('#stockMovementType').addEventListener('change', (event) => {
+  const isTransfer = event.target.value === 'transfer';
+  $('#stockDestLabel').hidden = !isTransfer;
+  $('#stockDestSelect').required = isTransfer;
+});
 $('#addStockButton').addEventListener('click', async () => { await refreshStockOptions(); stockModal.classList.add('open'); });
 $('#closeStockModal').addEventListener('click', closeStockModal);
 $('#cancelStockModal').addEventListener('click', closeStockModal);
@@ -1412,10 +1440,22 @@ $('#stockForm').addEventListener('submit', async (event) => {
   const form = new FormData(event.target);
   if (window.crmDb?.ready && (!form.get('part') || !form.get('warehouse'))) { window.alert('Migration inventory atau master spare part belum siap.'); return; }
   if (window.crmDb?.ready) {
-    const result = await window.crmDb.createInventoryMovement({ spare_part_id: form.get('part'), warehouse_id: form.get('warehouse'), movement_type: form.get('movementType'), quantity: Number(form.get('quantity')), unit_cost: Number(form.get('unitCost')) || 0, notes: form.get('notes') || null });
-    if (result.error) { window.alert(`Pergerakan stok belum tersimpan: ${result.error.message}`); return; }
+    if (form.get('movementType') === 'transfer') {
+      if (form.get('warehouse') === form.get('destWarehouse')) { window.alert('Gudang asal dan tujuan tidak boleh sama.'); return; }
+      const transferId = window.crypto?.randomUUID ? window.crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16); });
+      const out = await window.crmDb.createInventoryMovement({ spare_part_id: form.get('part'), warehouse_id: form.get('warehouse'), movement_type: 'outbound', quantity: Number(form.get('quantity')), unit_cost: Number(form.get('unitCost')) || 0, reference_type: 'transfer_out', reference_id: transferId, notes: form.get('notes') || 'Transfer antar gudang' });
+      if (out.error) { window.alert(`Transfer gagal: ${out.error.message}`); return; }
+      const incoming = await window.crmDb.createInventoryMovement({ spare_part_id: form.get('part'), warehouse_id: form.get('destWarehouse'), movement_type: 'inbound', quantity: Number(form.get('quantity')), unit_cost: Number(form.get('unitCost')) || 0, reference_type: 'transfer_in', reference_id: transferId, notes: form.get('notes') || 'Transfer antar gudang' });
+      if (incoming.error) { window.alert(`Stok keluar tercatat, tetapi stok masuk gagal: ${incoming.error.message}`); return; }
+      showToast('Transfer antar gudang berhasil.');
+    } else {
+      const result = await window.crmDb.createInventoryMovement({ spare_part_id: form.get('part'), warehouse_id: form.get('warehouse'), movement_type: form.get('movementType'), quantity: Number(form.get('quantity')), unit_cost: Number(form.get('unitCost')) || 0, notes: form.get('notes') || null });
+      if (result.error) { window.alert(`Pergerakan stok belum tersimpan: ${result.error.message}`); return; }
+      showToast('Pergerakan stok tersimpan.');
+    }
   }
   event.target.reset();
+  $('#stockDestLabel').hidden = true;
   closeStockModal();
 });
 applyTwoColumn(partModal, 660);
@@ -1425,3 +1465,158 @@ applyTwoColumn(maintenanceModal, 560);
 applyTwoColumn(workOrderModal, 560);
 applyTwoColumn(reportModal, 600);
 applyTwoColumn($('#assetModalBackdrop'), 640);
+const stockCardModal = document.createElement('div');
+stockCardModal.className = 'modal-backdrop';
+stockCardModal.innerHTML = '<div class="modal inventory-modal"><div class="modal-header"><div><p class="eyebrow">KARTU PERSEDIAAN</p><h2 id="stockCardTitle">Kartu stok</h2></div><button class="icon-button" id="closeStockCard"><svg><use href="#i-close"/></svg></button></div><label>Pilih spare part<select id="stockCardPartSelect"></select></label><div class="table-scroll"><table><thead><tr><th>TANGGAL</th><th>KETERANGAN</th><th>GUDANG</th><th>MASUK</th><th>KELUAR</th><th>SALDO</th></tr></thead><tbody id="stockCardRows"><tr><td colspan="6">Pilih spare part.</td></tr></tbody></table></div><div class="modal-actions"><button class="primary-button" id="closeStockCardButton" type="button">Tutup</button></div></div>';
+document.body.append(stockCardModal);
+applyTwoColumn(stockCardModal, 720);
+const closeStockCard = () => stockCardModal.classList.remove('open');
+$('#closeStockCard').addEventListener('click', closeStockCard);
+$('#closeStockCardButton').addEventListener('click', closeStockCard);
+stockCardModal.addEventListener('click', (event) => { if (event.target === stockCardModal) closeStockCard(); });
+const movementLabel = (movement) => ({ inbound: movement.reference_type === 'opening_balance' ? 'Stok awal' : movement.reference_type === 'transfer_in' ? 'Transfer masuk' : 'Stok masuk', outbound: movement.reference_type === 'transfer_out' ? 'Transfer keluar' : 'Stok keluar', adjustment: 'Adjustment' }[movement.movement_type] || movement.movement_type);
+async function openStockCard(sparePartId) {
+  $('#stockCardPartSelect').innerHTML = partCache.map((part) => `<option value="${part.spare_part_id}"${String(part.spare_part_id) === String(sparePartId) ? ' selected' : ''}>${part.part_code} · ${part.name}</option>`).join('');
+  await reloadStockCard();
+  stockCardModal.classList.add('open');
+}
+async function reloadStockCard() {
+  const sparePartId = $('#stockCardPartSelect').value;
+  if (!sparePartId) return;
+  const part = partCache.find((item) => String(item.spare_part_id) === String(sparePartId));
+  $('#stockCardTitle').textContent = `Kartu stok · ${part?.part_code || ''}`;
+  const result = await window.crmDb.getPartMovements(sparePartId);
+  if (result.error) { $('#stockCardRows').innerHTML = `<tr><td colspan="6">Gagal memuat: ${result.error.message}</td></tr>`; return; }
+  let balance = 0;
+  const rows = (result.data || []).map((movement) => {
+    const qty = Number(movement.quantity);
+    balance += movement.movement_type === 'outbound' ? -qty : qty;
+    return `<tr><td>${new Date(movement.created_at).toLocaleString('id-ID')}</td><td>${movementLabel(movement)}${movement.notes ? `<br><small>${movement.notes}</small>` : ''}</td><td>${movement.warehouses?.name || '-'}</td><td>${movement.movement_type === 'outbound' ? '-' : qty}</td><td>${movement.movement_type === 'outbound' ? qty : '-'}</td><td><b>${balance}</b></td></tr>`;
+  });
+  $('#stockCardRows').innerHTML = rows.length ? rows.join('') : '<tr><td colspan="6">Belum ada pergerakan.</td></tr>';
+}
+$('#stockCardPartSelect').addEventListener('change', reloadStockCard);
+$('#stockHistoryButton').addEventListener('click', () => openStockCard(partCache[0]?.spare_part_id));
+const stockMatrixModal = document.createElement('div');
+stockMatrixModal.className = 'modal-backdrop';
+stockMatrixModal.innerHTML = '<div class="modal inventory-modal"><div class="modal-header"><div><p class="eyebrow">BARANG PER GUDANG</p><h2>Stok per gudang</h2></div><button class="icon-button" id="closeStockMatrix"><svg><use href="#i-close"/></svg></button></div><div class="table-scroll"><table><thead><tr id="stockMatrixHeadRow"><th>PART</th><th>TOTAL</th></tr></thead><tbody id="stockMatrixRows"><tr><td colspan="3">Memuat...</td></tr></tbody></table></div><div class="modal-actions"><button class="primary-button" id="closeStockMatrixButton" type="button">Tutup</button></div></div>';
+document.body.append(stockMatrixModal);
+applyTwoColumn(stockMatrixModal, 720);
+const closeStockMatrix = () => stockMatrixModal.classList.remove('open');
+$('#closeStockMatrix').addEventListener('click', closeStockMatrix);
+$('#closeStockMatrixButton').addEventListener('click', closeStockMatrix);
+stockMatrixModal.addEventListener('click', (event) => { if (event.target === stockMatrixModal) closeStockMatrix(); });
+$('#stockMatrixButton').addEventListener('click', async () => {
+  const [warehouses, movements] = await Promise.all([window.crmDb.getWarehouses(), window.crmDb.getAllMovements()]);
+  if (warehouses.error || movements.error) { showToast(`Gagal memuat: ${(warehouses.error || movements.error).message}`, true); return; }
+  const grid = {};
+  (movements.data || []).forEach((movement) => {
+    const key = `${movement.spare_part_id}__${movement.warehouse_id}`;
+    grid[key] = (grid[key] || 0) + (movement.movement_type === 'outbound' ? -Number(movement.quantity) : Number(movement.quantity));
+  });
+  const warehouseList = warehouses.data || [];
+  $('#stockMatrixHeadRow').innerHTML = `<th>PART</th>${warehouseList.map((w) => `<th>${w.name.toUpperCase()}</th>`).join('')}<th>TOTAL</th>`;
+  $('#stockMatrixRows').innerHTML = partCache.map((part) => {
+    const cells = warehouseList.map((w) => grid[`${part.spare_part_id}__${w.id}`] || 0);
+    const total = cells.reduce((sum, qty) => sum + qty, 0);
+    return `<tr><td><span class="part-code">${part.part_code}</span><br><small>${part.name}</small></td>${cells.map((qty) => `<td>${qty}</td>`).join('')}<td><b>${total}</b></td></tr>`;
+  }).join('') || '<tr><td colspan="3">Belum ada part.</td></tr>';
+  stockMatrixModal.classList.add('open');
+});
+const opnameModal = document.createElement('div');
+opnameModal.className = 'modal-backdrop';
+opnameModal.innerHTML = '<div class="modal inventory-modal"><div class="modal-header"><div><p class="eyebrow">STOK OPNAME</p><h2>Hitung fisik persediaan</h2></div><button class="icon-button" id="closeOpnameModal"><svg><use href="#i-close"/></svg></button></div><label>Gudang<select id="opnameWarehouseSelect"></select></label><label>Catatan<input id="opnameNotes" placeholder="Keterangan opname" /></label><div class="table-scroll"><table><thead><tr><th>PART</th><th>SISTEM</th><th>HASIL HITUNG</th></tr></thead><tbody id="opnameRows"><tr><td colspan="3">Memuat...</td></tr></tbody></table></div><div class="modal-actions"><button type="button" class="secondary-button" id="cancelOpnameModal">Batal</button><button class="primary-button" id="saveOpnameButton" type="button">Simpan & sesuaikan</button></div></div>';
+document.body.append(opnameModal);
+applyTwoColumn(opnameModal, 720);
+const closeOpnameModal = () => opnameModal.classList.remove('open');
+$('#closeOpnameModal').addEventListener('click', closeOpnameModal);
+$('#cancelOpnameModal').addEventListener('click', closeOpnameModal);
+opnameModal.addEventListener('click', (event) => { if (event.target === opnameModal) closeOpnameModal(); });
+const opnameSystemQty = {};
+async function openOpnameModal() {
+  const [warehouses, movements] = await Promise.all([window.crmDb.getWarehouses(), window.crmDb.getAllMovements()]);
+  if (warehouses.error || movements.error) { showToast(`Gagal memuat: ${(warehouses.error || movements.error).message}`, true); return; }
+  $('#opnameWarehouseSelect').innerHTML = '<option value="">Semua gudang</option>' + (warehouses.data || []).map((w) => `<option value="${w.id}">${w.name}</option>`).join('');
+  const renderOpnameRows = () => {
+    const warehouseId = $('#opnameWarehouseSelect').value;
+    Object.keys(opnameSystemQty).forEach((key) => delete opnameSystemQty[key]);
+    $('#opnameRows').innerHTML = partCache.map((part) => {
+      let system = 0;
+      (movements.data || []).forEach((movement) => {
+        if (String(movement.spare_part_id) !== String(part.spare_part_id)) return;
+        if (warehouseId && String(movement.warehouse_id) !== String(warehouseId)) return;
+        system += movement.movement_type === 'outbound' ? -Number(movement.quantity) : Number(movement.quantity);
+      });
+      opnameSystemQty[part.spare_part_id] = system;
+      return `<tr><td><span class="part-code">${part.part_code}</span><br><small>${part.name}</small></td><td>${system} ${part.unit}</td><td><input type="number" min="0" step="0.01" data-counted-for="${part.spare_part_id}" placeholder="Isi hasil hitung" /></td></tr>`;
+    }).join('') || '<tr><td colspan="3">Belum ada part.</td></tr>';
+  };
+  $('#opnameWarehouseSelect').onchange = renderOpnameRows;
+  renderOpnameRows();
+  opnameModal.classList.add('open');
+}
+$('#opnameButton').addEventListener('click', openOpnameModal);
+$('#saveOpnameButton').addEventListener('click', async () => {
+  const warehouseId = $('#opnameWarehouseSelect').value || null;
+  const diffs = [];
+  $$('#opnameRows input[data-counted-for]').forEach((input) => {
+    if (input.value === '' || input.value === null) return;
+    const counted = Number(input.value);
+    if (Number.isNaN(counted)) return;
+    diffs.push({ partId: input.dataset.countedFor, counted, system: opnameSystemQty[input.dataset.countedFor] || 0 });
+  });
+  if (!diffs.length) { showToast('Isi dulu hasil hitung fisik.', true); return; }
+  const order = await window.crmDb.createOpnameOrder({ warehouse_id: warehouseId, notes: $('#opnameNotes').value || null });
+  if (order.error) { showToast(`Opname gagal dibuat: ${order.error.message}`, true); return; }
+  await window.crmDb.createOpnameItems(diffs.map((row) => ({ order_id: order.data.id, spare_part_id: row.partId, warehouse_id: warehouseId, system_qty: row.system, counted_qty: row.counted })));
+  let adjusted = 0;
+  const defaultWarehouse = warehouseId || (await window.crmDb.getWarehouses()).data?.[0]?.id;
+  for (const row of diffs) {
+    const diff = row.counted - row.system;
+    if (!diff) continue;
+    const targetWarehouse = warehouseId || defaultWarehouse;
+    if (!targetWarehouse) continue;
+    const movement = await window.crmDb.createInventoryMovement({ spare_part_id: row.partId, warehouse_id: targetWarehouse, movement_type: diff > 0 ? 'inbound' : 'outbound', quantity: Math.abs(diff), unit_cost: 0, reference_type: 'opname', reference_id: order.data.id, notes: `Penyesuaian opname ${order.data.order_code}` });
+    if (!movement.error) adjusted += 1;
+  }
+  closeOpnameModal();
+  showToast(`Opname tersimpan. ${adjusted} part disesuaikan.`);
+});
+const vendorMasterModal = document.createElement('div');
+vendorMasterModal.className = 'modal-backdrop';
+vendorMasterModal.innerHTML = '<div class="modal relation-modal"><div class="modal-header"><div><p class="eyebrow">MASTER DATA</p><h2>Pemasok</h2></div><button class="icon-button" id="closeVendorMaster"><svg><use href="#i-close"/></svg></button></div><div class="customer-contact-list" id="vendorMasterList"></div><form id="vendorMasterForm"><div class="quotation-form-grid"><label>Nama pemasok<input required name="name" placeholder="Nama vendor" /></label><label>Telepon<input name="phone" placeholder="0812..." /></label><label>Email<input type="email" name="email" placeholder="vendor@email.com" /></label></div><label>Alamat<input name="address" placeholder="Alamat vendor" /></label><div class="modal-actions"><button type="button" class="secondary-button" id="cancelVendorMaster">Tutup</button><button class="primary-button" type="submit">Simpan pemasok</button></div></form></div>';
+document.body.append(vendorMasterModal);
+applyTwoColumn(vendorMasterModal, 680);
+const closeVendorMaster = () => vendorMasterModal.classList.remove('open');
+$('#closeVendorMaster').addEventListener('click', closeVendorMaster);
+$('#cancelVendorMaster').addEventListener('click', closeVendorMaster);
+vendorMasterModal.addEventListener('click', (event) => { if (event.target === vendorMasterModal) closeVendorMaster(); });
+async function refreshVendorMaster() {
+  const result = await window.crmDb.getVendors();
+  if (result.error) return;
+  $('#vendorMasterList').innerHTML = result.data?.length
+    ? result.data.map((vendor) => `<div class="detail-pic"><div><b>${vendor.name}</b><small>${vendor.phone || vendor.email || '-'}</small></div>${isAdmin() ? `<button class="icon-button master-delete" data-id="${vendor.id}" data-name="${vendor.name}" title="Hapus">✕</button>` : ''}</div>`).join('')
+    : '<div class="detail-pic"><div><b>Belum ada pemasok</b></div></div>';
+  const datalist = $('#vendorDatalist');
+  if (datalist) datalist.innerHTML = (result.data || []).map((vendor) => `<option value="${vendor.name}">`).join('');
+}
+vendorMasterModal.addEventListener('click', async (event) => {
+  const button = event.target.closest('.master-delete');
+  if (!button) return;
+  if (!isAdmin()) { showToast('Hanya administrator yang dapat menghapus pemasok.', true); return; }
+  if (!window.confirm(`Hapus pemasok "${button.dataset.name}"?`)) return;
+  const result = await window.crmDb.deleteVendor(button.dataset.id);
+  if (result.error) { showToast(`Gagal menghapus: ${result.error.message}`, true); return; }
+  showToast('Pemasok dihapus.');
+  await refreshVendorMaster();
+});
+$('#vendorMasterForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = new FormData(event.target);
+  const result = await window.crmDb.createVendor({ name: form.get('name'), phone: form.get('phone') || null, email: form.get('email') || null, address: form.get('address') || null });
+  if (result.error) { showToast(`Pemasok belum tersimpan: ${result.error.message}`, true); return; }
+  event.target.reset();
+  showToast('Pemasok tersimpan.');
+  await refreshVendorMaster();
+});
+$('#vendorMasterButton').addEventListener('click', async () => { await refreshVendorMaster(); vendorMasterModal.classList.add('open'); });

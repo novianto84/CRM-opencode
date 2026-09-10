@@ -22,6 +22,7 @@ Profil customer dan logo tersedia di `supabase/migrations/004_customer_profile.s
 12. Jalankan query `supabase/migrations/008_contact_photo_secondary_fields.sql` untuk foto contact, HP 2, dan email 2 (nomor WhatsApp lama dipindahkan ke HP 2).
 13. Jalankan query `supabase/migrations/009_spare_part_pricing.sql` untuk pricelist, dimensi/berat, harga beli terakhir, dan histori harga vendor.
 14. Jalankan query `supabase/migrations/010_item_masters.sql` untuk tipe barang, kategori, merk, satuan bertingkat, foto produk, dan komposisi paket.
+15. Jalankan query `supabase/migrations/011_vendors_opname.sql` untuk master pemasok dan dokumen stok opname.
 
 ## Struktur Utama
 
