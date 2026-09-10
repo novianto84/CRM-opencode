@@ -7,6 +7,22 @@ const showToast = (message, error = false) => {
   document.body.append(toast);
   window.setTimeout(() => toast.remove(), 3200);
 };
+const applyTwoColumn = (modalEl, boxWidth) => {
+  if (!modalEl || !modalEl.querySelector) return;
+  const narrow = window.matchMedia && window.matchMedia('(max-width:600px)').matches;
+  const box = modalEl.querySelector('.modal');
+  if (box) { box.style.width = `min(100%,${narrow ? 440 : boxWidth}px)`; box.style.maxHeight = '90vh'; box.style.overflowY = 'auto'; }
+  const grid = modalEl.querySelector('form .customer-form-grid, form .employee-form-grid') || modalEl.querySelector('form');
+  if (!grid) return;
+  if (narrow) { grid.style.display = ''; grid.style.gridTemplateColumns = ''; grid.style.gap = ''; return; }
+  grid.style.display = 'grid';
+  grid.style.gridTemplateColumns = '1fr 1fr';
+  grid.style.gap = '0 15px';
+  grid.querySelectorAll(':scope > .modal-actions, :scope > .detail-section-heading, :scope > .customer-contact-list, :scope > .company-logo').forEach((el) => { el.style.gridColumn = '1/-1'; });
+  modalEl.querySelectorAll('textarea, input[name="address"], input[name="contactAddress"]').forEach((el) => { const label = el.closest('label'); if (label) label.style.gridColumn = '1/-1'; });
+  const existing = modalEl.querySelector('#relationExistingLabel');
+  if (existing) existing.style.gridColumn = '1/-1';
+};
 
 const modal = $('#modalBackdrop');
 const openModal = () => modal.classList.add('open');
@@ -150,6 +166,7 @@ const contactEditorModal = document.createElement('div');
 contactEditorModal.className = 'modal-backdrop';
 contactEditorModal.innerHTML = '<div class="modal relation-modal"><div class="modal-header"><div><p class="eyebrow">CONTACT DETAIL</p><h2>Edit contact</h2></div><button class="icon-button" id="closeContactEditor"><svg><use href="#i-close"/></svg></button></div><div class="company-logo" id="contactPhotoPreviewWrap"><span id="contactPhotoPreview">?</span><div><b>Foto profil</b><small id="contactPhotoNote">Belum ada foto</small></div></div><form id="contactEditorForm"><label>Nama lengkap<input required name="name" placeholder="Nama lengkap" /></label><label>Jabatan<input name="position" placeholder="Jabatan" /></label><label>Handphone 1<input name="phone" placeholder="0812 0000 0000" /></label><label>Handphone 2<input name="phone2" placeholder="Nomor kedua" /></label><label>Email 1<input type="email" name="email" placeholder="email@customer.com" /></label><label>Email 2<input type="email" name="email2" placeholder="Email kedua (opsional)" /></label><label>Foto profil<input type="file" name="photo" accept="image/png,image/jpeg,image/webp" /></label><label>Nomor identitas<input name="identityNumber" placeholder="KTP / identitas lain" /></label><label>Tanggal lahir<input type="date" name="birthDate" /></label><label>Alamat<input name="contactAddress" placeholder="Alamat tinggal" /></label><label>Catatan<textarea name="contactNotes" rows="2" placeholder="Catatan tambahan"></textarea></label><div class="detail-section-heading"><h3>Customer terhubung</h3></div><div class="customer-contact-list" id="contactCustomerLinks"></div><div class="modal-actions"><button type="button" class="secondary-button" id="cancelContactEditor">Batal</button><button class="primary-button" type="submit">Simpan perubahan</button></div></form></div>';
 document.body.append(contactEditorModal);
+applyTwoColumn(contactEditorModal, 680);
 let editingContactId = null;
 const closeContactEditor = () => contactEditorModal.classList.remove('open');
 $('#closeContactEditor').addEventListener('click', closeContactEditor);
@@ -440,6 +457,7 @@ function refreshEmployeeFormVisibility() {
   hrSensitiveIds.forEach((id) => { const el = document.getElementById(id); if (el) el.hidden = !full; });
 }
 document.body.append(employeeModal);
+applyTwoColumn(employeeModal, 620);
 const closeEmployeeModal = () => employeeModal.classList.remove('open');
 let editingEmployeeId = null;
 $('#addEmployeeButton').addEventListener('click', () => { editingEmployeeId = null; $('#employeeForm').reset(); employeeModal.querySelector('h2').textContent = 'Tambah karyawan'; refreshEmployeeFormVisibility(); employeeModal.classList.add('open'); });
@@ -564,6 +582,7 @@ customerModal.className = 'modal-backdrop';
 customerModal.id = 'customerModal';
 customerModal.innerHTML = '<div class="modal customer-modal"><div class="modal-header"><div><p class="eyebrow">MASTER DATA CUSTOMER</p><h2>Tambah customer</h2></div><button class="icon-button" id="closeCustomerModal"><svg><use href="#i-close"/></svg></button></div><p class="modal-description">Customer menyimpan data akun. PIC dapat ditambahkan dan dihubungkan secara terpisah.</p><form id="customerForm"><div class="customer-form-grid"><label>Nama customer<input required name="name" placeholder="Nama perusahaan atau perorangan" /></label><label>PIC utama<input name="contact" placeholder="Nama PIC utama (opsional)" /></label><label>No. telepon<input name="phone" placeholder="0812 0000 0000" /></label><label>Email<input type="email" name="email" placeholder="customer@email.com" /></label><label>NPWP<input name="npwp" placeholder="Nomor NPWP" /></label><label>Logo perusahaan<input type="file" name="logo" accept="image/png,image/jpeg,image/webp" /></label><label>Alamat<input name="address" placeholder="Kota / alamat singkat" /></label></div><div class="modal-actions"><button type="button" class="secondary-button" id="cancelCustomerModal">Batal</button><button class="primary-button" type="submit">Simpan customer</button></div></form></div>';
 document.body.append(customerModal);
+applyTwoColumn(customerModal, 640);
 const customerStatusField = document.createElement('label');
 customerStatusField.innerHTML = 'Status customer<select required name="status"><option value="Prospect">Prospect</option><option value="Active" selected>Active</option><option value="Inactive">Inactive</option><option value="Suspended">Suspended</option><option value="Archived">Archived</option></select>';
 $('#customerForm .customer-form-grid').append(customerStatusField);
@@ -724,6 +743,7 @@ const relationModal = document.createElement('div');
 relationModal.className = 'modal-backdrop';
 relationModal.innerHTML = '<div class="modal relation-modal"><div class="modal-header"><div><p class="eyebrow" id="relationEyebrow">CUSTOMER RELATION</p><h2 id="relationTitle">Tambah PIC</h2></div><button class="icon-button" id="closeRelationModal"><svg><use href="#i-close"/></svg></button></div><form id="relationForm"><label id="relationExistingLabel">Gunakan contact yang sudah ada<select name="existingContact" id="relationExistingContact"><option value="">-- Buat contact baru --</option></select></label><label id="relationNameLabel">Nama PIC<input required name="name" placeholder="Nama lengkap" /></label><label id="relationPositionLabel">Jabatan<input name="position" placeholder="Jabatan atau keterangan" /></label><label id="relationRoleLabel">Peran PIC<input name="role" placeholder="Contoh: Procurement, Finance, Teknisi" /></label><label>No. telepon<input name="phone" placeholder="0812 0000 0000" /></label><label id="relationPhone2Label">Handphone 2<input name="phone2" placeholder="Nomor kedua" /></label><label>Email<input type="email" name="email" placeholder="email@customer.com" /></label><label id="relationEmail2Label">Email 2<input type="email" name="email2" placeholder="Email kedua (opsional)" /></label><label id="relationIdentityLabel">Nomor identitas<input name="identityNumber" placeholder="KTP / identitas lain" /></label><label id="relationBirthDateLabel">Tanggal lahir<input type="date" name="birthDate" /></label><label id="relationContactAddressLabel">Alamat contact<input name="contactAddress" placeholder="Alamat tinggal contact" /></label><label id="relationNotesLabel">Catatan<textarea name="contactNotes" rows="2" placeholder="Catatan tambahan"></textarea></label><label id="relationAddressLabel" hidden>Alamat lokasi<input name="address" placeholder="Alamat lengkap lokasi" /></label><div class="modal-actions"><button type="button" class="secondary-button" id="cancelRelationModal">Batal</button><button class="primary-button" type="submit">Simpan</button></div></form></div>';
 document.body.append(relationModal);
+applyTwoColumn(relationModal, 680);
 let relationMode = 'pic';
 let relationCustomerId = null;
 const closeRelationModal = () => relationModal.classList.remove('open');
@@ -1182,6 +1202,7 @@ const vendorModal = document.createElement('div');
 vendorModal.className = 'modal-backdrop';
 vendorModal.innerHTML = '<div class="modal relation-modal"><div class="modal-header"><div><p class="eyebrow">HARGA VENDOR</p><h2 id="vendorTitle">Penawaran vendor</h2></div><button class="icon-button" id="closeVendorModal"><svg><use href="#i-close"/></svg></button></div><div class="customer-contact-list" id="vendorPriceList"></div><form id="vendorPriceForm"><div class="quotation-form-grid"><label>Nama vendor<input required name="vendor" placeholder="Nama vendor" /></label><label>Harga penawaran (Rp)<input required type="number" min="0" name="price" placeholder="Rp" /></label><label>Berlaku sampai<input type="date" name="validUntil" /></label></div><label>Catatan<input name="notes" placeholder="Syarat atau catatan vendor" /></label><div class="modal-actions"><button type="button" class="secondary-button" id="cancelVendorModal">Batal</button><button class="primary-button" type="submit">Simpan penawaran</button></div></form></div>';
 document.body.append(vendorModal);
+applyTwoColumn(vendorModal, 680);
 const closeVendorModal = () => vendorModal.classList.remove('open');
 $('#closeVendorModal').addEventListener('click', closeVendorModal);
 $('#cancelVendorModal').addEventListener('click', closeVendorModal);
