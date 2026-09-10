@@ -181,6 +181,58 @@
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('spare_part_vendor_prices').insert(payload).select().single();
     },
+    async getCategories() {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('item_categories').select('*').eq('is_active', true).order('name');
+    },
+    async createCategory(payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('item_categories').upsert(payload, { onConflict: 'name' }).select().single();
+    },
+    async deleteCategory(id) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('item_categories').delete().eq('id', id);
+    },
+    async getBrands() {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('item_brands').select('*').eq('is_active', true).order('name');
+    },
+    async createBrand(payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('item_brands').upsert(payload, { onConflict: 'name' }).select().single();
+    },
+    async deleteBrand(id) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('item_brands').delete().eq('id', id);
+    },
+    async getUnits() {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('units').select('*').eq('is_active', true).order('code');
+    },
+    async createUnit(payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('units').upsert(payload, { onConflict: 'code' }).select().single();
+    },
+    async deleteUnit(id) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('units').delete().eq('id', id);
+    },
+    async getItemUnits(sparePartId) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('item_units').select('*').eq('spare_part_id', sparePartId).order('conversion_to_base');
+    },
+    async createItemUnit(payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('item_units').upsert(payload, { onConflict: 'spare_part_id,unit' }).select().single();
+    },
+    async uploadItemPhoto(sparePartId, file) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      const path = `${sparePartId}/${Date.now()}-${file.name.replace(/[^a-z0-9.\-_]/gi, '-')}`;
+      const upload = await window.supabaseClient.storage.from('item-photos').upload(path, file, { upsert: true, contentType: file.type });
+      if (upload.error) return { data: null, error: upload.error };
+      const { data } = window.supabaseClient.storage.from('item-photos').getPublicUrl(path);
+      return { data: { publicUrl: data.publicUrl }, error: null };
+    },
     async createInventoryMovement(payload) {
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('inventory_movements').insert(payload).select().single();

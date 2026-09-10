@@ -12,6 +12,7 @@ create type public.operation_mode as enum ('standby', 'schedule', 'running_24h')
 create type public.maintenance_type as enum ('preventive', 'corrective', 'inspection');
 create type public.maintenance_status as enum ('planned', 'in_progress', 'completed', 'cancelled');
 create type public.work_order_status as enum ('draft', 'open', 'assigned', 'in_progress', 'waiting_customer', 'completed', 'cancelled');
+create type public.item_type as enum ('stock', 'non_stock', 'service', 'group');
 
 create or replace function public.set_updated_at()
 returns trigger
@@ -236,6 +237,8 @@ create table public.spare_parts (
   list_price numeric(14, 2) not null default 0,
   last_purchase_price numeric(14, 2),
   last_purchase_date date,
+  item_type public.item_type not null default 'stock',
+  photo_url text,
   is_active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -253,6 +256,49 @@ create table public.spare_part_vendor_prices (
   notes text,
   recorded_by uuid references public.employees(id) on delete set null,
   created_at timestamptz not null default now()
+);
+
+create table public.item_categories (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  description text,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+create table public.item_brands (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+create table public.units (
+  id uuid primary key default gen_random_uuid(),
+  code text not null unique,
+  name text,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+create table public.item_units (
+  id uuid primary key default gen_random_uuid(),
+  spare_part_id uuid not null references public.spare_parts(id) on delete cascade,
+  unit text not null,
+  conversion_to_base numeric(14, 4) not null check (conversion_to_base > 0),
+  sale_price numeric(14, 2) not null default 0 check (sale_price >= 0),
+  created_at timestamptz not null default now(),
+  unique (spare_part_id, unit)
+);
+
+create table public.spare_part_bundle_items (
+  id uuid primary key default gen_random_uuid(),
+  parent_id uuid not null references public.spare_parts(id) on delete cascade,
+  child_id uuid not null references public.spare_parts(id) on delete restrict,
+  quantity numeric(12, 2) not null check (quantity > 0),
+  created_at timestamptz not null default now(),
+  unique (parent_id, child_id),
+  check (parent_id <> child_id)
 );
 
 create table public.maintenance_parts (
@@ -348,7 +394,8 @@ begin
   foreach table_name in array array[
     'employees', 'customers', 'customer_locations', 'contacts', 'customer_contacts', 'assets',
     'asset_ownership_history', 'maintenance_schedules', 'work_orders',
-    'maintenance_records', 'spare_parts', 'spare_part_vendor_prices', 'maintenance_parts', 'audit_logs'
+    'maintenance_records', 'spare_parts', 'spare_part_vendor_prices', 'item_categories', 'item_brands',
+    'units', 'item_units', 'spare_part_bundle_items', 'maintenance_parts', 'audit_logs'
   ] loop
     execute format('alter table public.%I enable row level security', table_name);
     execute format('drop policy if exists authenticated_full_access on public.%I', table_name);

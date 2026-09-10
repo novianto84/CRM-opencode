@@ -21,6 +21,7 @@ Profil customer dan logo tersedia di `supabase/migrations/004_customer_profile.s
 11. Jalankan query `supabase/migrations/007_employee_sensitive_fields.sql` untuk field sensitif karyawan (foto, HP/email kedua, NPWP, bank) dan view direktori publik.
 12. Jalankan query `supabase/migrations/008_contact_photo_secondary_fields.sql` untuk foto contact, HP 2, dan email 2 (nomor WhatsApp lama dipindahkan ke HP 2).
 13. Jalankan query `supabase/migrations/009_spare_part_pricing.sql` untuk pricelist, dimensi/berat, harga beli terakhir, dan histori harga vendor.
+14. Jalankan query `supabase/migrations/010_item_masters.sql` untuk tipe barang, kategori, merk, satuan bertingkat, foto produk, dan komposisi paket.
 
 ## Struktur Utama
 
@@ -33,8 +34,11 @@ Profil customer dan logo tersedia di `supabase/migrations/004_customer_profile.s
 - `maintenance_schedules`: jadwal dan reminder maintenance.
 - `maintenance_records`: histori pekerjaan perawatan.
 - `work_orders`: SPK.
-- `spare_parts`: master suku cadang, pricelist, dimensi, dan harga beli terakhir.
+- `spare_parts`: master suku cadang, tipe barang, pricelist, dimensi, foto, dan harga beli terakhir.
 - `spare_part_vendor_prices`: histori harga penawaran vendor per spare part.
+- `item_categories`, `item_brands`, `units`: master kategori, merk, dan satuan.
+- `item_units`: konversi satuan bertingkat dan harga per satuan.
+- `spare_part_bundle_items`: komposisi barang tipe grup/paket.
 - `maintenance_parts`: suku cadang yang dipakai pada pekerjaan.
 - `employees`: user internal dan level akses.
 - `audit_logs`: histori perubahan record.
