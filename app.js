@@ -369,7 +369,13 @@ if (sharedAssetId) {
 }
 $('#assetSearch').addEventListener('input', filterAssets);
 $('#assetStatusFilter').addEventListener('change', filterAssets);
-$('#addAssetButton').addEventListener('click', openAssetModal);
+const refreshAssetCustomerOptions = () => {
+  const select = $('#assetForm select[name="customer"]');
+  if (!select) return;
+  const names = [...new Set($$('#customerRows tr').map((row) => row.querySelector('.person b')?.textContent).filter(Boolean))];
+  if (names.length) select.innerHTML = names.map((name) => `<option value="${name}">${name}</option>`).join('');
+};
+$('#addAssetButton').addEventListener('click', () => { refreshAssetCustomerOptions(); openAssetModal(); });
 
 $('#assetForm').addEventListener('submit', async (event) => {
   event.preventDefault();
