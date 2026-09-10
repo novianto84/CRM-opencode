@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Tes Vendor - RuangCRM</title>
+<style>body{font:14px Arial,sans-serif;max-width:640px;margin:32px auto;padding:0 16px;color:#182235}li{margin:6px 0}.ok{color:#198b69}.bad{color:#c0392b}input,button{font:inherit;padding:9px 12px;margin:4px 0}input{width:100%;box-sizing:border-box}pre{background:#f4f6fa;padding:12px;border-radius:8px;white-space:pre-wrap;font-size:12px}</style>
+</head>
+<body>
+<h1>Tes Koneksi Vendor</h1>
+<ol id="steps"><li>Memuat...</li></ol>
+<h2>Tambah pemasok (tes langsung)</h2>
+<input id="vendorName" placeholder="Nama vendor" />
+<button id="testAddVendor" type="button">Simpan pemasok</button>
+<pre id="log">Log akan tampil di sini.</pre>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js?v=29"></script>
+<script src="supabase-client.js?v=29"></script>
+<script>
+const logEl = document.getElementById('log');
+const log = (msg) => { logEl.textContent += '\n' + msg; };
+const stepsEl = document.getElementById('steps');
+const step = (text, ok) => {
+  const li = document.createElement('li');
+  li.textContent = text;
+  li.className = ok === true ? 'ok' : ok === false ? 'bad' : '';
+  stepsEl.append(li);
+};
+(async () => {
+  stepsEl.innerHTML = '';
+  step('SDK Supabase: ' + (window.supabase ? 'OK' : 'GAGAL'), !!window.supabase);
+  step('Konfigurasi: ' + (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url ? window.SUPABASE_CONFIG.url : 'KOSONG'), !!(window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url));
+  step('Adapter crmDb ready: ' + (window.crmDb && window.crmDb.ready), !!(window.crmDb && window.crmDb.ready));
+  if (!window.crmDb || !window.crmDb.ready) { log('Adapter tidak siap, berhenti.'); return; }
+  try {
+    const session = await window.supabaseClient.auth.getSession();
+    step('Session login: ' + (session.data.session ? session.data.session.user.email : 'BELUM LOGIN'), !!session.data.session);
+  } catch (err) { step('Session error: ' + err.message, false); }
+  try {
+    const vendors = await window.crmDb.getVendors();
+    step('getVendors(): ' + (vendors.error ? 'ERROR: ' + vendors.error.message : 'OK, ' + (vendors.data || []).length + ' baris'), !vendors.error);
+  } catch (err) { step('getVendors() THROW: ' + (err && err.message), false); }
+  document.getElementById('testAddVendor').addEventListener('click', async () => {
+    const name = document.getElementById('vendorName').value.trim();
+    if (!name) { log('Isi nama dulu.'); return; }
+    try {
+      log('Menyimpan "' + name + '"...');
+      const result = await window.crmDb.createVendor({ name });
+      if (result.error) log('GAGAL: ' + result.error.message);
+      else log('BERHASIL, id=' + result.data.id);
+    } catch (err) { log('THROW: ' + (err && err.message)); }
+  });
+})();
+</script>
+</body>
+</html>
