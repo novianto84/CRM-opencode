@@ -27,6 +27,7 @@ Profil customer dan logo tersedia di `supabase/migrations/004_customer_profile.s
 17. Jalankan query `supabase/migrations/013_view_pricing_columns.sql` untuk kolom harga dan pajak di view inventory.
 18. Jalankan query `supabase/migrations/014_purchasing.sql` untuk purchase order dan penerimaan barang.
 19. Jalankan query `supabase/migrations/015_sales.sql` untuk pesanan penjualan, pengiriman, faktur, dan pembayaran.
+20. Jalankan query `supabase/migrations/016_serial_numbers.sql` untuk pelacakan nomor seri/batch dan tanggal kadaluarsa.
 
 ## Struktur Utama
 

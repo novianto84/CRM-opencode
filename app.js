@@ -1176,7 +1176,7 @@ $('#reportForm').addEventListener('submit', async (event) => {
 
 const partModal = document.createElement('div');
 partModal.className = 'modal-backdrop';
-partModal.innerHTML = '<div class="modal inventory-modal"><div class="modal-header"><div><p class="eyebrow">MASTER SPARE PART</p><h2>Tambah spare part</h2></div><button class="icon-button" id="closePartModal"><svg><use href="#i-close"/></svg></button></div><form id="partForm"><div class="part-form-grid"><label>Part number<input required name="partCode" placeholder="Contoh: FLT-OLI-125" /></label><label>Nama part<input required name="name" placeholder="Nama spare part" /></label><label>Tipe barang<select required name="itemType"><option value="stock">Persediaan (stok dihitung)</option><option value="non_stock">Non Persediaan (habis pakai)</option><option value="service">Jasa</option><option value="group">Grup / Paket</option></select></label><label>Kategori<input name="category" list="categoryDatalist" placeholder="Filter / Electrical" /></label><label>Brand<input name="brand" list="brandDatalist" placeholder="Contoh: Fleetguard" /></label><label>Satuan dasar<input required name="unit" list="unitDatalist" placeholder="pcs" value="pcs" /></label><label>Minimum stok<input required type="number" min="0" name="minimumStock" value="0" /></label><label>Harga pricelist (Rp)<input type="number" min="0" name="listPrice" placeholder="Harga jual" /></label><label>Diskon default (%)<input type="number" min="0" max="100" step="0.01" name="discountPct" placeholder="0" /></label><label>Minimum jual<input type="number" min="0" step="0.01" name="minSell" placeholder="1" /></label><label>PPN (%)<input type="number" min="0" max="100" step="0.01" name="ppnRate" placeholder="Contoh: 11" /></label><label>Ref. kode pajak<input name="refTax" placeholder="Kode referensi DJP" /></label><label>Berat (kg)<input type="number" min="0" step="0.001" name="weight" placeholder="Contoh: 2.5" /></label><label>Panjang (cm)<input type="number" min="0" step="0.1" name="length" placeholder="Contoh: 30" /></label><label>Lebar (cm)<input type="number" min="0" step="0.1" name="width" placeholder="Contoh: 20" /></label><label>Tinggi (cm)<input type="number" min="0" step="0.1" name="height" placeholder="Contoh: 15" /></label><label>Harga beli terakhir (Rp)<input type="number" min="0" name="lastPurchasePrice" placeholder="Harga beli terakhir" /></label><label>Tanggal beli terakhir<input type="date" name="lastPurchaseDate" /></label><label>Foto produk<input type="file" name="photo" accept="image/png,image/jpeg,image/webp" /></label><label>Gudang stok awal<select name="openingWarehouse" id="partOpeningWarehouse"><option value="">-- Tanpa stok awal --</option></select></label><label>Qty stok awal<input type="number" min="0" step="0.01" name="openingQty" placeholder="0" /></label><label>Biaya satuan awal (Rp)<input type="number" min="0" name="openingCost" placeholder="Harga modal" /></label><label class="part-full">Spesifikasi<input name="specification" placeholder="Detail ukuran atau spesifikasi teknis" /></label><label class="part-full">Compatible model<input name="compatibleModels" placeholder="Contoh: RG 125 / 150 kVA" /></label><div class="part-full"><div class="detail-section-heading"><h3>Satuan konversi</h3><button type="button" class="text-button" id="addUnitRowButton">+ Tambah satuan</button></div><div id="unitConversionRows"></div><datalist id="categoryDatalist"></datalist><datalist id="brandDatalist"></datalist><datalist id="unitDatalist"></datalist></div></div><div class="modal-actions"><button type="button" class="secondary-button" id="cancelPartModal">Batal</button><button class="primary-button" type="submit">Simpan spare part</button></div></form></div>';
+partModal.innerHTML = '<div class="modal inventory-modal"><div class="modal-header"><div><p class="eyebrow">MASTER SPARE PART</p><h2>Tambah spare part</h2></div><button class="icon-button" id="closePartModal"><svg><use href="#i-close"/></svg></button></div><form id="partForm"><div class="part-form-grid"><label>Part number<input required name="partCode" placeholder="Contoh: FLT-OLI-125" /></label><label>Nama part<input required name="name" placeholder="Nama spare part" /></label><label>Tipe barang<select required name="itemType"><option value="stock">Persediaan (stok dihitung)</option><option value="non_stock">Non Persediaan (habis pakai)</option><option value="service">Jasa</option><option value="group">Grup / Paket</option></select></label><label>Kategori<input name="category" list="categoryDatalist" placeholder="Filter / Electrical" /></label><label>Brand<input name="brand" list="brandDatalist" placeholder="Contoh: Fleetguard" /></label><label>Satuan dasar<input required name="unit" list="unitDatalist" placeholder="pcs" value="pcs" /></label><label>Minimum stok<input required type="number" min="0" name="minimumStock" value="0" /></label><label>Harga pricelist (Rp)<input type="number" min="0" name="listPrice" placeholder="Harga jual" /></label><label>Diskon default (%)<input type="number" min="0" max="100" step="0.01" name="discountPct" placeholder="0" /></label><label>Minimum jual<input type="number" min="0" step="0.01" name="minSell" placeholder="1" /></label><label>PPN (%)<input type="number" min="0" max="100" step="0.01" name="ppnRate" placeholder="Contoh: 11" /></label><label>Ref. kode pajak<input name="refTax" placeholder="Kode referensi DJP" /></label><label>Berat (kg)<input type="number" min="0" step="0.001" name="weight" placeholder="Contoh: 2.5" /></label><label>Panjang (cm)<input type="number" min="0" step="0.1" name="length" placeholder="Contoh: 30" /></label><label>Lebar (cm)<input type="number" min="0" step="0.1" name="width" placeholder="Contoh: 20" /></label><label>Tinggi (cm)<input type="number" min="0" step="0.1" name="height" placeholder="Contoh: 15" /></label><label>Harga beli terakhir (Rp)<input type="number" min="0" name="lastPurchasePrice" placeholder="Harga beli terakhir" /></label><label>Tanggal beli terakhir<input type="date" name="lastPurchaseDate" /></label><label>Foto produk<input type="file" name="photo" accept="image/png,image/jpeg,image/webp" /></label><label class="approval-check"><input type="checkbox" name="isSerialized" /> Lacak nomor seri per unit</label><label>Gudang stok awal<select name="openingWarehouse" id="partOpeningWarehouse"><option value="">-- Tanpa stok awal --</option></select></label><label>Qty stok awal<input type="number" min="0" step="0.01" name="openingQty" placeholder="0" /></label><label>Biaya satuan awal (Rp)<input type="number" min="0" name="openingCost" placeholder="Harga modal" /></label><label class="part-full">Spesifikasi<input name="specification" placeholder="Detail ukuran atau spesifikasi teknis" /></label><label class="part-full">Compatible model<input name="compatibleModels" placeholder="Contoh: RG 125 / 150 kVA" /></label><div class="part-full"><div class="detail-section-heading"><h3>Satuan konversi</h3><button type="button" class="text-button" id="addUnitRowButton">+ Tambah satuan</button></div><div id="unitConversionRows"></div><datalist id="categoryDatalist"></datalist><datalist id="brandDatalist"></datalist><datalist id="unitDatalist"></datalist></div></div><div class="modal-actions"><button type="button" class="secondary-button" id="cancelPartModal">Batal</button><button class="primary-button" type="submit">Simpan spare part</button></div></form></div>';
 document.body.append(partModal);
 const closePartModal = () => partModal.classList.remove('open');
 async function refreshPartMasters() {
@@ -1221,7 +1221,7 @@ $('#partForm').addEventListener('submit', async (event) => {
   const form = new FormData(event.target);
   let newPartId = null;
   if (window.crmDb?.ready && editingPartId) {
-    const payload = { part_code: form.get('partCode'), name: form.get('name'), item_type: form.get('itemType') || 'stock', brand: form.get('brand') || null, category: form.get('category') || null, unit: form.get('unit') || 'pcs', minimum_stock: Number(form.get('minimumStock')), weight_kg: Number(form.get('weight')) || null, length_cm: Number(form.get('length')) || null, width_cm: Number(form.get('width')) || null, height_cm: Number(form.get('height')) || null, list_price: Number(form.get('listPrice')) || 0, default_discount_pct: Number(form.get('discountPct')) || 0, min_sell_qty: Number(form.get('minSell')) || 1, ppn_rate: Number(form.get('ppnRate')) || 0, ref_tax_code: form.get('refTax') || null, last_purchase_price: Number(form.get('lastPurchasePrice')) || null, last_purchase_date: form.get('lastPurchaseDate') || null, specification: form.get('specification') || null, compatible_models: form.get('compatibleModels') || null };
+    const payload = { part_code: form.get('partCode'), name: form.get('name'), item_type: form.get('itemType') || 'stock', brand: form.get('brand') || null, category: form.get('category') || null, unit: form.get('unit') || 'pcs', minimum_stock: Number(form.get('minimumStock')), weight_kg: Number(form.get('weight')) || null, length_cm: Number(form.get('length')) || null, width_cm: Number(form.get('width')) || null, height_cm: Number(form.get('height')) || null, list_price: Number(form.get('listPrice')) || 0, default_discount_pct: Number(form.get('discountPct')) || 0, min_sell_qty: Number(form.get('minSell')) || 1, ppn_rate: Number(form.get('ppnRate')) || 0, ref_tax_code: form.get('refTax') || null, is_serialized: Boolean(form.get('isSerialized')), last_purchase_price: Number(form.get('lastPurchasePrice')) || null, last_purchase_date: form.get('lastPurchaseDate') || null, specification: form.get('specification') || null, compatible_models: form.get('compatibleModels') || null };
     const updated = await window.crmDb.updateSparePart(editingPartId, payload);
     if (updated.error) { showToast(`Part belum tersimpan: ${updated.error.message}`, true); return; }
     const photoFile = form.get('photo');
@@ -1261,7 +1261,7 @@ $('#partForm').addEventListener('submit', async (event) => {
     if (categoryName) await window.crmDb.createCategory({ name: categoryName });
     if (brandName) await window.crmDb.createBrand({ name: brandName });
     await window.crmDb.createUnit({ code: baseUnit, name: baseUnit });
-    const result = await window.crmDb.createSparePart({ part_code: form.get('partCode'), name: form.get('name'), item_type: form.get('itemType') || 'stock', brand: brandName, category: categoryName, unit: baseUnit, minimum_stock: Number(form.get('minimumStock')), weight_kg: Number(form.get('weight')) || null, length_cm: Number(form.get('length')) || null, width_cm: Number(form.get('width')) || null, height_cm: Number(form.get('height')) || null, list_price: Number(form.get('listPrice')) || 0, default_discount_pct: Number(form.get('discountPct')) || 0, min_sell_qty: Number(form.get('minSell')) || 1, ppn_rate: Number(form.get('ppnRate')) || 0, ref_tax_code: form.get('refTax') || null, last_purchase_price: Number(form.get('lastPurchasePrice')) || null, last_purchase_date: form.get('lastPurchaseDate') || null, specification: form.get('specification') || null, compatible_models: form.get('compatibleModels') || null });
+    const result = await window.crmDb.createSparePart({ part_code: form.get('partCode'), name: form.get('name'), item_type: form.get('itemType') || 'stock', brand: brandName, category: categoryName, unit: baseUnit, minimum_stock: Number(form.get('minimumStock')), weight_kg: Number(form.get('weight')) || null, length_cm: Number(form.get('length')) || null, width_cm: Number(form.get('width')) || null, height_cm: Number(form.get('height')) || null, list_price: Number(form.get('listPrice')) || 0, default_discount_pct: Number(form.get('discountPct')) || 0, min_sell_qty: Number(form.get('minSell')) || 1, ppn_rate: Number(form.get('ppnRate')) || 0, ref_tax_code: form.get('refTax') || null, is_serialized: Boolean(form.get('isSerialized')), last_purchase_price: Number(form.get('lastPurchasePrice')) || null, last_purchase_date: form.get('lastPurchaseDate') || null, specification: form.get('specification') || null, compatible_models: form.get('compatibleModels') || null });
     if (result.error) { window.alert(`Spare part belum tersimpan: ${result.error.message}`); return; }
     newPartId = result.data?.id;
     if (newPartId) {
@@ -1314,7 +1314,7 @@ function bindPartRowButtons() {
 let editingPartId = null;
 const partDetailModal = document.createElement('div');
 partDetailModal.className = 'modal-backdrop';
-partDetailModal.innerHTML = '<div class="modal relation-modal"><div class="modal-header"><div><p class="eyebrow">DETAIL SPARE PART</p><h2 id="partDetailName">Spare part</h2><p class="detail-subtitle" id="partDetailCode"></p></div><button class="icon-button" id="closePartDetail"><svg><use href="#i-close"/></svg></button></div><div class="company-logo" id="partDetailPhoto"></div><div class="customer-contact-list" id="partDetailInfo"></div><div class="modal-actions"><button class="secondary-button" id="partStockCardButton" type="button">Kartu stok</button><button class="secondary-button" id="partVendorButton" type="button">Harga vendor</button><button class="primary-button" id="partEditButton" type="button">Edit part</button></div></div>';
+partDetailModal.innerHTML = '<div class="modal relation-modal"><div class="modal-header"><div><p class="eyebrow">DETAIL SPARE PART</p><h2 id="partDetailName">Spare part</h2><p class="detail-subtitle" id="partDetailCode"></p></div><button class="icon-button" id="closePartDetail"><svg><use href="#i-close"/></svg></button></div><div class="company-logo" id="partDetailPhoto"></div><div class="customer-contact-list" id="partDetailInfo"></div><div class="detail-section-heading"><h3>Komposisi paket</h3></div><div class="customer-contact-list" id="partBundleList"></div><div class="master-add"><select id="newBundleChildSelect"></select><input id="newBundleQty" type="number" min="0.01" step="any" placeholder="Qty" value="1" /><button class="secondary-button" id="addBundleButton" type="button">Tambah</button></div><div class="detail-section-heading"><h3>Nomor seri / batch</h3></div><div class="customer-contact-list" id="partSerialList"></div><div class="master-add"><input id="newSerialCode" placeholder="No. seri" /><input id="newSerialBatch" placeholder="Batch (opsional)" /><input id="newSerialExpiry" type="date" /></div><div class="master-add"><select id="newSerialWarehouse"></select><button class="secondary-button" id="addSerialButton" type="button">Tambah</button></div><div class="modal-actions"><button class="secondary-button" id="partStockCardButton" type="button">Kartu stok</button><button class="secondary-button" id="partVendorButton" type="button">Harga vendor</button><button class="primary-button" id="partEditButton" type="button">Edit part</button></div></div>';
 document.body.append(partDetailModal);
 applyTwoColumn(partDetailModal, 680);
 const closePartDetail = () => partDetailModal.classList.remove('open');
@@ -1343,8 +1343,65 @@ async function openPartDetail(sparePartId) {
     ['Stok', cached ? `${cached.stock_on_hand} ${part.unit} (min. ${cached.minimum_stock})` : null],
     ['Spesifikasi', part.specification || null]
   ].filter((row) => row && row[1]).map(([label, value]) => `<div class="detail-pic"><div><b>${label}</b><small>${value}</small></div></div>`).join('') || '<div class="detail-pic"><div><b>Belum ada detail</b></div></div>';
+  await refreshPartExtras(sparePartId);
   partDetailModal.classList.add('open');
 }
+async function refreshPartExtras(sparePartId) {
+  const [serials, bundle, warehouses] = await Promise.all([window.crmDb.getSerials(sparePartId), window.crmDb.getBundleChildren(sparePartId), window.crmDb.getWarehouses()]);
+  const serialStatus = { available: 'status-green', used: 'status-gray', expired: 'status-yellow' };
+  $('#partSerialList').innerHTML = serials.data?.length
+    ? serials.data.map((serial) => `<div class="detail-pic"><div><b>${serial.serial_code}</b><small>${serial.batch_code ? `Batch ${serial.batch_code} · ` : ''}${serial.warehouses?.name || ''}${serial.expiry_date ? ` · EXP ${serial.expiry_date}` : ''}</small></div><span class="status ${serialStatus[serial.status] || 'status-gray'}">${serial.status}</span><button class="text-button serial-toggle" data-id="${serial.id}" data-status="${serial.status}" title="Ubah status">${serial.status === 'available' ? 'Pakai' : 'Aktifkan'}</button>${isAdmin() ? `<button class="icon-button serial-delete" data-id="${serial.id}" title="Hapus">✕</button>` : ''}</div>`).join('')
+    : '<div class="detail-pic"><div><b>Belum ada nomor seri</b><small>Aktifkan pencatatan seri per unit bila perlu</small></div></div>';
+  $('#partBundleList').innerHTML = bundle.data?.length
+    ? bundle.data.map((row) => `<div class="detail-pic"><div><b>${row.child?.part_code || ''} · ${row.child?.name || '-'}</b><small>Qty ${row.quantity} ${row.child?.unit || ''}</small></div>${isAdmin() ? `<button class="icon-button bundle-delete" data-id="${row.id}" title="Hapus">✕</button>` : ''}</div>`).join('')
+    : '<div class="detail-pic"><div><b>Bukan paket / belum ada isi</b><small>Tambahkan komponen bila tipe Grup</small></div></div>';
+  $('#newBundleChildSelect').innerHTML = partCache.filter((part) => String(part.spare_part_id) !== String(sparePartId)).map((part) => `<option value="${part.spare_part_id}">${part.part_code} · ${part.name}</option>`).join('');
+  $('#newSerialWarehouse').innerHTML = '<option value="">-- Gudang --</option>' + (warehouses.data || []).map((w) => `<option value="${w.id}">${w.name}</option>`).join('');
+}
+partDetailModal.addEventListener('click', async (event) => {
+  const toggle = event.target.closest('.serial-toggle');
+  if (toggle) {
+    const result = await window.crmDb.updateSerial(toggle.dataset.id, { status: toggle.dataset.status === 'available' ? 'used' : 'available' });
+    if (result.error) showToast(`Gagal memperbarui: ${result.error.message}`, true);
+    else { showToast('Status seri diperbarui.'); await refreshPartExtras(activePartDetailId); }
+    return;
+  }
+  const serialDelete = event.target.closest('.serial-delete');
+  if (serialDelete) {
+    if (!isAdmin() || !window.confirm('Hapus nomor seri ini?')) return;
+    const result = await window.crmDb.deleteSerial(serialDelete.dataset.id);
+    if (result.error) showToast(`Gagal menghapus: ${result.error.message}`, true);
+    else { showToast('Seri dihapus.'); await refreshPartExtras(activePartDetailId); }
+    return;
+  }
+  const bundleDelete = event.target.closest('.bundle-delete');
+  if (bundleDelete) {
+    if (!isAdmin() || !window.confirm('Hapus komponen paket ini?')) return;
+    const result = await window.crmDb.deleteBundleItem(bundleDelete.dataset.id);
+    if (result.error) showToast(`Gagal menghapus: ${result.error.message}`, true);
+    else { showToast('Komponen dihapus.'); await refreshPartExtras(activePartDetailId); }
+  }
+});
+$('#addSerialButton').addEventListener('click', async () => {
+  const code = $('#newSerialCode').value.trim();
+  if (!code || !activePartDetailId) { showToast('Isi nomor seri dulu.', true); return; }
+  const result = await window.crmDb.createSerial({ spare_part_id: activePartDetailId, serial_code: code, batch_code: $('#newSerialBatch').value.trim() || null, expiry_date: $('#newSerialExpiry').value || null, warehouse_id: $('#newSerialWarehouse').value || null });
+  if (result.error) { showToast(`Gagal menyimpan: ${result.error.message}`, true); return; }
+  $('#newSerialCode').value = '';
+  $('#newSerialBatch').value = '';
+  $('#newSerialExpiry').value = '';
+  showToast('Nomor seri tersimpan.');
+  await refreshPartExtras(activePartDetailId);
+});
+$('#addBundleButton').addEventListener('click', async () => {
+  const childId = $('#newBundleChildSelect').value;
+  const qty = Number($('#newBundleQty').value);
+  if (!childId || !(qty > 0) || !activePartDetailId) { showToast('Pilih komponen dan qty.', true); return; }
+  const result = await window.crmDb.createBundleItem({ parent_id: activePartDetailId, child_id: childId, quantity: qty });
+  if (result.error) { showToast(`Gagal menyimpan: ${result.error.message}`, true); return; }
+  showToast('Komponen paket tersimpan.');
+  await refreshPartExtras(activePartDetailId);
+});
 $('#partEditButton').addEventListener('click', () => { closePartDetail(); openPartEditor(activePartDetailId); });
 $('#partVendorButton').addEventListener('click', async () => {
   const part = partCache.find((item) => String(item.spare_part_id) === String(activePartDetailId));
@@ -1384,6 +1441,7 @@ async function openPartEditor(sparePartId) {
   set('lastPurchaseDate', part.last_purchase_date || '');
   set('specification', part.specification || '');
   set('compatibleModels', part.compatible_models || '');
+  $('#partForm input[name="isSerialized"]').checked = Boolean(part.is_serialized);
   $('#unitConversionRows').innerHTML = '';
   (unitsResult.data || []).filter((u) => Number(u.conversion_to_base) !== 1).forEach((u) => {
     $('#addUnitRowButton').click();

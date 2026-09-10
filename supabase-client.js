@@ -373,6 +373,34 @@
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('invoice_payments').insert(payload).select().single();
     },
+    async getSerials(sparePartId) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('serial_numbers').select('*, warehouses(name)').eq('spare_part_id', sparePartId).order('created_at', { ascending: false }).limit(200);
+    },
+    async createSerial(payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('serial_numbers').insert(payload).select().single();
+    },
+    async updateSerial(id, payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('serial_numbers').update(payload).eq('id', id).select().single();
+    },
+    async deleteSerial(id) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('serial_numbers').delete().eq('id', id);
+    },
+    async getBundleChildren(parentId) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('spare_part_bundle_items').select('id, quantity, child:spare_parts!spare_part_bundle_items_child_id_fkey(spare_part_id, part_code, name, unit)').eq('parent_id', parentId);
+    },
+    async createBundleItem(payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('spare_part_bundle_items').insert(payload).select().single();
+    },
+    async deleteBundleItem(id) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('spare_part_bundle_items').delete().eq('id', id);
+    },
     async uploadItemPhoto(sparePartId, file) {
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       const path = `${sparePartId}/${Date.now()}-${file.name.replace(/[^a-z0-9.\-_]/gi, '-')}`;

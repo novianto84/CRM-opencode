@@ -514,6 +514,21 @@ create table public.invoice_payments (
   created_at timestamptz not null default now()
 );
 
+create table public.serial_numbers (
+  id uuid primary key default gen_random_uuid(),
+  spare_part_id uuid not null references public.spare_parts(id) on delete cascade,
+  serial_code text not null,
+  batch_code text,
+  expiry_date date,
+  warehouse_id uuid references public.warehouses(id) on delete set null,
+  status text not null default 'available' check (status in ('available', 'used', 'expired')),
+  reference_type text,
+  reference_id uuid,
+  notes text,
+  created_at timestamptz not null default now(),
+  unique (spare_part_id, serial_code)
+);
+
 create or replace function public.refresh_sales_order_total()
 returns trigger
 language plpgsql
@@ -652,7 +667,7 @@ begin
     'units', 'item_units', 'spare_part_bundle_items', 'warehouses', 'vendors', 'stock_opname_orders',
     'stock_opname_items', 'item_price_tiers', 'item_substitutes', 'purchase_orders', 'purchase_order_items',
     'goods_receipts', 'goods_receipt_items', 'sales_orders', 'sales_order_items', 'delivery_orders',
-    'delivery_items', 'sales_invoices', 'invoice_payments', 'maintenance_parts', 'audit_logs'
+    'delivery_items', 'sales_invoices', 'invoice_payments', 'serial_numbers', 'maintenance_parts', 'audit_logs'
   ] loop
     execute format('alter table public.%I enable row level security', table_name);
     execute format('drop policy if exists authenticated_full_access on public.%I', table_name);
