@@ -1497,8 +1497,14 @@ async function openVendorModal(sparePartId, partCode) {
   if (!window.crmDb?.ready || !sparePartId) { showToast('Pilih spare part dari database untuk melihat harga vendor.', true); return; }
   activeVendorPartId = sparePartId;
   $('#vendorTitle').textContent = `Penawaran vendor · ${partCode || ''}`;
-  await refreshVendorPrices();
+  $('#vendorPriceList').innerHTML = '<div class="detail-pic"><div><b>Memuat...</b></div></div>';
   vendorModal.classList.add('open');
+  try {
+    await refreshVendorPrices();
+  } catch (err) {
+    $('#vendorPriceList').innerHTML = `<div class="detail-pic"><div><b>Gagal memuat</b><small>${err?.message || err}</small></div></div>`;
+    showToast(`Harga vendor gagal dimuat: ${err?.message || err}`, true);
+  }
 }
 $('#vendorPriceList').addEventListener('click', async (event) => {
   const button = event.target.closest('.use-vendor-price');
