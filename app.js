@@ -124,7 +124,7 @@ const renderPlainContactRows = (contacts) => contacts.map((contact) => {
 }).join('');
 function refreshInventoryMetrics() {
   const cards = $$('.inventory-metrics .inventory-metric b');
-  if (cards.length < 4 || !partCache.length) return;
+  if (cards.length < 4) return;
   const low = partCache.filter((part) => (Number(part.stock_on_hand) || 0) <= (Number(part.minimum_stock) || 0)).length;
   const value = partCache.reduce((sum, part) => sum + (Number(part.stock_on_hand) || 0) * (Number(part.last_purchase_price) || 0), 0);
   cards[0].textContent = `${partCache.length}`;
@@ -900,7 +900,12 @@ const renderDbMaintenanceRows = (schedules) => schedules.map((schedule) => {
   return `<tr data-maintenance-status="planned"><td><div class="schedule-name"><span class="schedule-icon schedule-blue">◷</span><div><b>${schedule.title}</b><small>${schedule.id.slice(0, 8).toUpperCase()}</small></div></div></td><td>${schedule.assets?.name || '-'}<br><small>${schedule.assets?.generator_serial || schedule.assets?.asset_code || '-'}</small></td><td>${schedule.assets?.customers?.name || '-'}</td><td>${type}</td><td>${dueDate}</td><td>Belum ditugaskan</td><td><span class="status status-blue">Terjadwal</span></td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`;
 }).join('');
 const renderDbWorkOrderRows = (orders) => orders.map((order) => `<tr data-workorder-status="${order.status}" data-workorder-id="${order.id}" data-asset-db-id="${order.assets?.id || ''}"><td><span class="workorder-code">${order.work_order_code}</span></td><td><b>${order.customers?.name || '-'}</b><small>${order.assets?.name || 'Belum ada aset'}</small></td><td>${order.title}</td><td>${order.employees?.full_name || 'Belum ditugaskan'}</td><td>${order.scheduled_at ? new Date(order.scheduled_at).toLocaleDateString('id-ID') : 'Belum dijadwalkan'}</td><td><span class="status status-blue">${order.status.replaceAll('_', ' ')}</span></td><td>${new Date(order.updated_at).toLocaleDateString('id-ID')}</td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`).join('');
-const renderDbPartRows = (parts) => parts.map((part) => `<tr data-spare-part-id="${part.spare_part_id}" data-stock="${part.stock_on_hand <= part.minimum_stock ? 'low' : 'safe'}"><td><span class="part-code">${part.part_code}</span></td><td><b>${part.name}</b><small>${part.unit}${part.weight_kg ? ` · ${part.weight_kg} kg` : ''}</small></td><td>${part.category || 'Spare part'}</td><td>Terdaftar di database</td><td><strong class="${part.stock_on_hand <= part.minimum_stock ? 'warning-text' : ''}">${part.stock_on_hand} ${part.unit}</strong></td><td>${part.minimum_stock} ${part.unit}</td><td>${part.list_price ? formatRupiah(part.list_price) : 'Belum diatur'}</td><td><button class="more-button" title="Harga vendor"><svg><use href="#i-more"/></svg></button></td></tr>`).join('');
+const itemTypeLabels = { stock: '', non_stock: 'Non persediaan', service: 'Jasa', group: 'Paket' };
+const renderDbPartRows = (parts) => parts.map((part) => {
+  const dims = [part.length_cm, part.width_cm, part.height_cm].some((dim) => Number(dim) > 0) ? `${part.length_cm || '-'} × ${part.width_cm || '-'} × ${part.height_cm || '-'} cm` : '';
+  const detail = [part.brand, part.weight_kg ? `${part.weight_kg} kg` : '', dims].filter(Boolean).join(' · ') || '-';
+  return `<tr data-spare-part-id="${part.spare_part_id}" data-stock="${part.stock_on_hand <= part.minimum_stock ? 'low' : 'safe'}"><td><span class="part-code">${part.part_code}</span></td><td><b>${part.name}</b><small>${part.unit}</small></td><td>${part.category || 'Spare part'}${itemTypeLabels[part.item_type] ? `<small>${itemTypeLabels[part.item_type]}</small>` : ''}</td><td><small>${detail}</small></td><td><strong class="${part.stock_on_hand <= part.minimum_stock ? 'warning-text' : ''}">${part.stock_on_hand} ${part.unit}</strong></td><td>${part.minimum_stock} ${part.unit}</td><td>${part.list_price ? formatRupiah(part.list_price) : 'Belum diatur'}${part.last_purchase_price ? `<small>Beli: ${formatRupiah(part.last_purchase_price)}</small>` : ''}</td><td><button class="more-button" title="Detail & harga vendor"><svg><use href="#i-more"/></svg></button></td></tr>`;
+}).join('');
 const renderDbEmployeeRows = (employees) => employees.map((employee) => {
   const initials = employee.full_name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
   const department = employee.department.toLowerCase().includes('service') ? 'service' : employee.department.toLowerCase().includes('sales') ? 'sales' : 'admin';
@@ -990,10 +995,10 @@ async function loadDatabaseData() {
     $('#workOrderCount').textContent = `${workOrderResult.data.length} dari ${workOrderResult.data.length}`;
     $$('#workOrderRows .more-button').forEach((button) => button.addEventListener('click', () => openWorkOrderReport(button.closest('tr'))));
   }
-  if (!partsResult.error && partsResult.data?.length) {
+  if (!partsResult.error && partsResult.data) {
     partCache = partsResult.data;
-    $('#partRows').innerHTML = renderDbPartRows(partsResult.data);
-    $('#partCount').textContent = `${partsResult.data.length} dari ${partsResult.data.length}`;
+    $('#partRows').innerHTML = partCache.length ? renderDbPartRows(partCache) : '<tr><td colspan="8">Belum ada spare part di database. Klik Tambah spare part untuk mulai.</td></tr>';
+    $('#partCount').textContent = `${partCache.length} dari ${partCache.length}`;
     bindPartRowButtons();
     refreshInventoryMetrics();
   }
@@ -1002,9 +1007,9 @@ async function loadDatabaseData() {
     $('#employeeCount').textContent = `${employeeResult.data.length} dari ${employeeResult.data.length}`;
     bindEmployeeRowButtons();
   }
-  if (!quotationResult.error && quotationResult.data?.length) {
+  if (!quotationResult.error && quotationResult.data) {
     quotationCache = quotationResult.data;
-    $('#quotationList').innerHTML = renderQuotations(quotationCache);
+    $('#quotationList').innerHTML = quotationCache.length ? renderQuotations(quotationCache) : '<div><div><b>Belum ada penawaran</b><small>Buat penawaran pertama ke customer</small></div></div>';
   }
   await reloadPurchaseOrders();
   const directoryError = await loadContactDirectory();
@@ -1195,7 +1200,7 @@ const filterParts = () => {
   const stock = $('#partStockFilter').value;
   let visible = 0;
   $$('#partRows tr').forEach((row) => { const match = row.textContent.toLowerCase().includes(query) && (stock === 'all' || row.dataset.stock === stock); row.hidden = !match; if (match) visible += 1; });
-  $('#partCount').textContent = `${visible} dari 248`;
+  $('#partCount').textContent = `${visible} dari ${partCache.length || $$('#partRows tr').length}`;
 };
 $('#partSearch').addEventListener('input', filterParts);
 $('#partStockFilter').addEventListener('change', filterParts);
@@ -1247,7 +1252,7 @@ $('#partForm').addEventListener('submit', async (event) => {
   $('#partRows').prepend(row);
   bindPartRowButtons();
   refreshInventoryMetrics();
-  $('#partCount').textContent = `${$('#partRows tr').length} dari 248`;
+  $('#partCount').textContent = `${$$('#partRows tr').filter((row) => !row.hidden).length} dari ${partCache.length || $$('#partRows tr').length}`;
   event.target.reset();
   $('#unitConversionRows').innerHTML = '';
   closePartModal();
