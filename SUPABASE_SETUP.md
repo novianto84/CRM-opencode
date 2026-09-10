@@ -25,6 +25,7 @@ Profil customer dan logo tersedia di `supabase/migrations/004_customer_profile.s
 15. Jalankan query `supabase/migrations/011_vendors_opname.sql` untuk master pemasok dan dokumen stok opname.
 16. Jalankan query `supabase/migrations/012_pricing_tax_substitutes.sql` untuk harga grosir bertingkat, PPN per barang, dan substitusi.
 17. Jalankan query `supabase/migrations/013_view_pricing_columns.sql` untuk kolom harga dan pajak di view inventory.
+18. Jalankan query `supabase/migrations/014_purchasing.sql` untuk purchase order dan penerimaan barang.
 
 ## Struktur Utama
 
@@ -42,6 +43,8 @@ Profil customer dan logo tersedia di `supabase/migrations/004_customer_profile.s
 - `item_categories`, `item_brands`, `units`: master kategori, merk, dan satuan.
 - `item_units`: konversi satuan bertingkat dan harga per satuan.
 - `spare_part_bundle_items`: komposisi barang tipe grup/paket.
+- `purchase_orders`, `purchase_order_items`: PO ke pemasok dengan total otomatis.
+- `goods_receipts`, `goods_receipt_items`: penerimaan barang yang menambah stok.
 - `maintenance_parts`: suku cadang yang dipakai pada pekerjaan.
 - `employees`: user internal dan level akses.
 - `audit_logs`: histori perubahan record.

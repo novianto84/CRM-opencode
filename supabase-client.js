@@ -289,6 +289,34 @@
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('quotations').update(payload).eq('id', id).select().single();
     },
+    async getPurchaseOrders() {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('purchase_orders').select('*, purchase_order_items(*)').order('created_at', { ascending: false }).limit(100);
+    },
+    async createPurchaseOrder(payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('purchase_orders').insert(payload).select().single();
+    },
+    async updatePurchaseOrder(id, payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('purchase_orders').update(payload).eq('id', id).select().single();
+    },
+    async createPurchaseOrderItems(rows) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('purchase_order_items').insert(rows).select();
+    },
+    async updatePurchaseOrderItem(id, payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('purchase_order_items').update(payload).eq('id', id).select().single();
+    },
+    async createGoodsReceipt(payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('goods_receipts').insert(payload).select().single();
+    },
+    async createGoodsReceiptItems(rows) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('goods_receipt_items').insert(rows).select();
+    },
     async uploadItemPhoto(sparePartId, file) {
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       const path = `${sparePartId}/${Date.now()}-${file.name.replace(/[^a-z0-9.\-_]/gi, '-')}`;

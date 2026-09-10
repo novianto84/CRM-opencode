@@ -1006,6 +1006,7 @@ async function loadDatabaseData() {
     quotationCache = quotationResult.data;
     $('#quotationList').innerHTML = renderQuotations(quotationCache);
   }
+  await reloadPurchaseOrders();
   const directoryError = await loadContactDirectory();
   const databaseErrors = [['Customer', customerResult], ['Aset', assetResult], ['Maintenance', scheduleResult], ['SPK', workOrderResult], ['Spare part', partsResult], ['Karyawan', employeeResult], ['Quotation', quotationResult]].filter(([, result]) => result.error).map(([name, result]) => `${name}: ${result.error.message}`);
   if (directoryError) databaseErrors.push(`Kontak: ${directoryError.message}`);
@@ -1564,6 +1565,155 @@ applyTwoColumn(maintenanceModal, 560);
 applyTwoColumn(workOrderModal, 560);
 applyTwoColumn(reportModal, 600);
 applyTwoColumn($('#assetModalBackdrop'), 640);
+let poCache = [];
+const poStatusClass = { draft: 'status-gray', sent: 'status-yellow', partial: 'status-purple', received: 'status-green', cancelled: 'status-gray' };
+const renderPurchaseOrders = (orders) => orders.slice(0, 5).map((po) => {
+  const items = po.purchase_order_items || [];
+  const received = items.reduce((sum, item) => sum + Number(item.received_qty), 0);
+  const ordered = items.reduce((sum, item) => sum + Number(item.quantity), 0);
+  return `<div><span class="quotation-code">${po.po_code}</span><div><b>${po.vendor_name || 'Tanpa vendor'}</b><small>${items.map((item) => `${item.description} × ${item.quantity}`).join(' · ') || 'Belum ada item'}</small></div><strong>${formatRupiah(po.total)}</strong><span class="status ${poStatusClass[po.status] || 'status-gray'}">${po.status}</span>${['draft', 'sent', 'partial'].includes(po.status) ? `<button class="more-button receive-po" data-po-id="${po.id}" title="Terima barang"><svg><use href="#i-more"/></svg></button>` : ''}${isAdmin() && !['received', 'cancelled'].includes(po.status) ? `<button class="icon-button cancel-po" data-po-id="${po.id}" title="Batalkan PO">✕</button>` : ''}<small>Diterima ${received}/${ordered}</small></div>`;
+}).join('');
+async function reloadPurchaseOrders() {
+  if (!window.crmDb?.ready) return;
+  const result = await window.crmDb.getPurchaseOrders();
+  if (result.error) return;
+  poCache = result.data || [];
+  if (poCache.length) {
+    $('#purchaseOrderList').innerHTML = renderPurchaseOrders(poCache);
+    $('#purchaseOrderCount').textContent = `${poCache.length} purchase order tercatat`;
+  }
+}
+const poModal = document.createElement('div');
+poModal.className = 'modal-backdrop';
+poModal.innerHTML = '<div class="modal relation-modal"><div class="modal-header"><div><p class="eyebrow">PEMBELIAN</p><h2>Buat purchase order</h2></div><button class="icon-button" id="closePOModal"><svg><use href="#i-close"/></svg></button></div><form id="poForm"><label>Pemasok<select required name="vendor" id="poVendorSelect"></select></label><div class="quotation-form-grid"><label>Tgl. diharapkan<input type="date" name="expectedDate" /></label></div><label>Catatan<input name="notes" placeholder="Catatan PO" /></label><div class="detail-section-heading"><h3>Item barang</h3><button type="button" class="text-button" id="addPOItemButton">+ Tambah baris</button></div><div id="poItemRows"></div><div class="modal-actions"><button type="button" class="secondary-button" id="cancelPOModal">Batal</button><button class="primary-button" type="submit">Simpan PO</button></div></form></div>';
+document.body.append(poModal);
+applyTwoColumn(poModal, 720);
+const closePOModal = () => poModal.classList.remove('open');
+$('#closePOModal').addEventListener('click', closePOModal);
+$('#cancelPOModal').addEventListener('click', closePOModal);
+poModal.addEventListener('click', (event) => { if (event.target === poModal) closePOModal(); });
+const poItemRow = () => {
+  const row = document.createElement('div');
+  row.className = 'unit-conv-row';
+  row.innerHTML = `<select name="poPart" style="grid-column:1/-1">${partCache.map((part) => `<option value="${part.spare_part_id}">${part.part_code} · ${part.name}</option>`).join('')}</select><input type="number" name="poQty" min="0.01" step="any" placeholder="Qty" value="1" /><input type="number" name="poPrice" min="0" placeholder="Harga Rp" /><button type="button" class="icon-button remove-unit-row" title="Hapus">✕</button>`;
+  row.querySelector('.remove-unit-row').addEventListener('click', () => row.remove());
+  const partSelect = row.querySelector('select[name="poPart"]');
+  const priceInput = row.querySelector('input[name="poPrice"]');
+  const fillPrice = () => { const part = partCache.find((item) => String(item.spare_part_id) === partSelect.value); if (part?.last_purchase_price) priceInput.value = part.last_purchase_price; };
+  partSelect.addEventListener('change', fillPrice);
+  fillPrice();
+  return row;
+};
+$('#addPOItemButton').addEventListener('click', () => $('#poItemRows').append(poItemRow()));
+$('#createPOButton').addEventListener('click', async () => {
+  const vendors = await window.crmDb.getVendors();
+  $('#poVendorSelect').innerHTML = (vendors.data || []).map((vendor) => `<option value="${vendor.id}">${vendor.name}</option>`).join('') || '<option value="">Belum ada pemasok</option>';
+  $('#poItemRows').innerHTML = '';
+  $('#poItemRows').append(poItemRow());
+  poModal.classList.add('open');
+});
+$('#poForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = new FormData(event.target);
+  if (!form.get('vendor')) { showToast('Pilih pemasok terlebih dahulu.', true); return; }
+  const vendorName = $('#poVendorSelect').selectedOptions[0]?.textContent || null;
+  const po = await window.crmDb.createPurchaseOrder({ vendor_id: form.get('vendor'), vendor_name: vendorName, expected_date: form.get('expectedDate') || null, notes: form.get('notes') || null });
+  if (po.error) { showToast(`PO belum tersimpan: ${po.error.message}`, true); return; }
+  const rows = $$('#poItemRows .unit-conv-row').map((row) => {
+    const part = partCache.find((item) => String(item.spare_part_id) === row.querySelector('select[name="poPart"]').value);
+    return { purchase_order_id: po.data.id, spare_part_id: part?.spare_part_id || null, description: part ? `${part.part_code} · ${part.name}` : 'Item', quantity: Number(row.querySelector('input[name="poQty"]').value) || 0, unit: part?.unit || 'pcs', unit_price: Number(row.querySelector('input[name="poPrice"]').value) || 0 };
+  }).filter((row) => row.quantity > 0);
+  if (!rows.length) { showToast('Tambahkan minimal satu item dengan qty.', true); return; }
+  const items = await window.crmDb.createPurchaseOrderItems(rows);
+  if (items.error) { showToast(`PO tersimpan, tetapi item gagal: ${items.error.message}`, true); return; }
+  event.target.reset();
+  $('#poItemRows').innerHTML = '';
+  closePOModal();
+  showToast('Purchase order tersimpan.');
+  await reloadPurchaseOrders();
+});
+$('#purchaseOrderList').addEventListener('click', async (event) => {
+  const receive = event.target.closest('.receive-po');
+  if (receive) { openReceiptModal(receive.dataset.poId); return; }
+  const cancel = event.target.closest('.cancel-po');
+  if (cancel && window.confirm('Batalkan purchase order ini?')) {
+    const result = await window.crmDb.updatePurchaseOrder(cancel.dataset.poId, { status: 'cancelled' });
+    if (result.error) showToast(`Gagal membatalkan: ${result.error.message}`, true);
+    else { showToast('PO dibatalkan.'); await reloadPurchaseOrders(); }
+  }
+});
+const receiptModal = document.createElement('div');
+receiptModal.className = 'modal-backdrop';
+receiptModal.innerHTML = '<div class="modal relation-modal"><div class="modal-header"><div><p class="eyebrow">PENERIMAAN BARANG</p><h2>Terima barang</h2></div><button class="icon-button" id="closeReceiptModal"><svg><use href="#i-close"/></svg></button></div><form id="receiptForm"><label>Purchase order<select name="po" id="receiptPOSelect"></select></label><label>Gudang penerima<select required name="warehouse" id="receiptWarehouseSelect"></select></label><label>Tanggal terima<input type="date" name="receivedDate" /></label><div class="detail-section-heading"><h3>Item diterima</h3></div><div id="receiptItemRows"></div><div class="modal-actions"><button type="button" class="secondary-button" id="cancelReceiptModal">Batal</button><button class="primary-button" type="submit">Simpan penerimaan</button></div></form></div>';
+document.body.append(receiptModal);
+applyTwoColumn(receiptModal, 720);
+const closeReceiptModal = () => receiptModal.classList.remove('open');
+$('#closeReceiptModal').addEventListener('click', closeReceiptModal);
+$('#cancelReceiptModal').addEventListener('click', closeReceiptModal);
+receiptModal.addEventListener('click', (event) => { if (event.target === receiptModal) closeReceiptModal(); });
+async function openReceiptModal(poId) {
+  await reloadPurchaseOrders();
+  const openPOs = poCache.filter((po) => ['draft', 'sent', 'partial'].includes(po.status));
+  $('#receiptPOSelect').innerHTML = '<option value="">Tanpa PO (langsung)</option>' + openPOs.map((po) => `<option value="${po.id}"${String(po.id) === String(poId) ? ' selected' : ''}>${po.po_code} · ${po.vendor_name || ''}</option>`).join('');
+  const warehouses = await window.crmDb.getWarehouses();
+  $('#receiptWarehouseSelect').innerHTML = (warehouses.data || []).map((w) => `<option value="${w.id}">${w.name}</option>`).join('');
+  renderReceiptItems();
+  $('#receiptPOSelect').onchange = renderReceiptItems;
+  receiptModal.classList.add('open');
+}
+function renderReceiptItems() {
+  const poId = $('#receiptPOSelect').value;
+  const po = poCache.find((item) => String(item.id) === String(poId));
+  if (po) {
+    $('#receiptItemRows').innerHTML = (po.purchase_order_items || []).map((item) => {
+      const remaining = Number(item.quantity) - Number(item.received_qty);
+      return `<div class="unit-conv-row" data-po-item="${item.id}" data-part="${item.spare_part_id || ''}"><span style="grid-column:1/-1"><b>${item.description}</b> <small>Sisa ${remaining} dari ${item.quantity}</small></span><input type="number" name="receiptQty" min="0" step="any" placeholder="Qty terima" value="${remaining > 0 ? remaining : 0}" /><input type="number" name="receiptCost" min="0" placeholder="Biaya satuan Rp" value="${item.unit_price || 0}" /><span></span></div>`;
+    }).join('');
+  } else {
+    $('#receiptItemRows').innerHTML = '';
+    const row = document.createElement('div');
+    row.className = 'unit-conv-row';
+    row.innerHTML = `<select name="receiptPart" style="grid-column:1/-1">${partCache.map((part) => `<option value="${part.spare_part_id}">${part.part_code} · ${part.name}</option>`).join('')}</select><input type="number" name="receiptQty" min="0.01" step="any" placeholder="Qty" value="1" /><input type="number" name="receiptCost" min="0" placeholder="Biaya satuan Rp" /><button type="button" class="icon-button remove-unit-row" title="Hapus">✕</button>`;
+    row.querySelector('.remove-unit-row').addEventListener('click', () => row.remove());
+    $('#receiptItemRows').append(row);
+  }
+}
+$('#receiveGoodsButton').addEventListener('click', () => openReceiptModal());
+$('#receiptForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = new FormData(event.target);
+  if (!form.get('warehouse')) { showToast('Pilih gudang penerima.', true); return; }
+  const poId = form.get('po') || null;
+  const receipt = await window.crmDb.createGoodsReceipt({ purchase_order_id: poId, warehouse_id: form.get('warehouse'), received_date: form.get('receivedDate') || null, notes: null });
+  if (receipt.error) { showToast(`Penerimaan gagal: ${receipt.error.message}`, true); return; }
+  const rows = $$('#receiptItemRows .unit-conv-row').map((row) => ({
+    poItemId: row.dataset.poItem || null,
+    partId: row.dataset.part || row.querySelector('select[name="receiptPart"]')?.value || null,
+    qty: Number(row.querySelector('input[name="receiptQty"]')?.value) || 0,
+    cost: Number(row.querySelector('input[name="receiptCost"]')?.value) || 0
+  })).filter((row) => row.partId && row.qty > 0);
+  if (!rows.length) { showToast('Isi qty terima minimal satu baris.', true); return; }
+  await window.crmDb.createGoodsReceiptItems(rows.map((row) => ({ receipt_id: receipt.data.id, purchase_order_item_id: row.poItemId, spare_part_id: row.partId, quantity: row.qty, unit_cost: row.cost })));
+  for (const row of rows) {
+    await window.crmDb.createInventoryMovement({ spare_part_id: row.partId, warehouse_id: form.get('warehouse'), movement_type: 'inbound', quantity: row.qty, unit_cost: row.cost, reference_type: 'purchase_receipt', reference_id: receipt.data.id, notes: `Penerimaan ${receipt.data.receipt_code}` });
+    await window.crmDb.updateSparePart(row.partId, { last_purchase_price: row.cost, last_purchase_date: form.get('receivedDate') || new Date().toISOString().slice(0, 10) });
+    if (row.poItemId) {
+      const po = poCache.find((item) => (item.purchase_order_items || []).some((poItem) => String(poItem.id) === String(row.poItemId)));
+      const poItem = po?.purchase_order_items.find((poItem) => String(poItem.id) === String(row.poItemId));
+      if (poItem) await window.crmDb.updatePurchaseOrderItem(row.poItemId, { received_qty: Number(poItem.received_qty) + row.qty });
+    }
+  }
+  if (poId) {
+    const updated = (await window.crmDb.getPurchaseOrders()).data?.find((po) => String(po.id) === String(poId));
+    if (updated) {
+      const allReceived = (updated.purchase_order_items || []).every((item) => Number(item.received_qty) >= Number(item.quantity));
+      await window.crmDb.updatePurchaseOrder(poId, { status: allReceived ? 'received' : 'partial' });
+    }
+  }
+  closeReceiptModal();
+  showToast('Barang diterima dan stok bertambah.');
+  await reloadPurchaseOrders();
+});
 const stockCardModal = document.createElement('div');
 stockCardModal.className = 'modal-backdrop';
 stockCardModal.innerHTML = '<div class="modal inventory-modal"><div class="modal-header"><div><p class="eyebrow">KARTU PERSEDIAAN</p><h2 id="stockCardTitle">Kartu stok</h2></div><button class="icon-button" id="closeStockCard"><svg><use href="#i-close"/></svg></button></div><label>Pilih spare part<select id="stockCardPartSelect"></select></label><div class="table-scroll"><table><thead><tr><th>TANGGAL</th><th>KETERANGAN</th><th>GUDANG</th><th>MASUK</th><th>KELUAR</th><th>SALDO</th></tr></thead><tbody id="stockCardRows"><tr><td colspan="6">Pilih spare part.</td></tr></tbody></table></div><div class="modal-actions"><button class="primary-button" id="closeStockCardButton" type="button">Tutup</button></div></div>';
