@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=26" />
+  <link rel="stylesheet" href="styles.css?v=27" />
 </head>
 <body>
   <svg class="svg-sprite" aria-hidden="true">
@@ -38,6 +38,7 @@
         <button class="nav-item" data-module="Customer"><svg><use href="#i-building"/></svg><span>Customer</span><em>32</em></button>
         <button class="nav-item" data-module="Kontak"><svg><use href="#i-users"/></svg><span>Kontak</span><em>248</em></button>
         <button class="nav-item" data-module="Inventory"><svg><use href="#i-box"/></svg><span>Inventory</span><em class="badge-warn">12</em></button>
+        <button class="nav-item" data-module="Pemasok"><svg><use href="#i-briefcase"/></svg><span>Pemasok</span><em id="vendorNavCount"></em></button>
         <button class="nav-item" data-module="Maintenance"><svg><use href="#i-receipt"/></svg><span>Maintenance</span><em class="badge-warn">7</em></button>
         <button class="nav-item" data-module="SPK"><svg><use href="#i-briefcase"/></svg><span>SPK / Work Order</span><em>4</em></button>
         <button class="nav-item" data-module="Pricing"><svg><use href="#i-tag"/></svg><span>Pricing</span></button>
@@ -50,7 +51,7 @@
         <button class="nav-item"><span class="nav-symbol">↗</span><span>Laporan</span></button>
         <button class="nav-item"><span class="nav-symbol">⚙</span><span>Pengaturan</span></button>
       </nav>
-      <div class="sidebar-bottom"><div class="help-card"><span class="help-icon">?</span><div><b>Butuh bantuan?</b><small>Hubungi support kami</small></div><svg><use href="#i-arrow"/></svg></div><div class="profile" id="profileMenu" role="button" tabindex="0" title="Akun saya"><div class="avatar avatar-purple" id="profileAvatar">AR</div><div><b id="profileName">Aditya Rahman</b><small id="profileRole">Administrator</small></div><span class="chevron">⌄</span></div><div class="profile-popover" id="profilePopover"><small id="profileEmail"></small><button class="secondary-button" id="logoutButton" type="button">Keluar</button></div><div class="app-version" id="appVersion">build v26</div></div>
+      <div class="sidebar-bottom"><div class="help-card"><span class="help-icon">?</span><div><b>Butuh bantuan?</b><small>Hubungi support kami</small></div><svg><use href="#i-arrow"/></svg></div><div class="profile" id="profileMenu" role="button" tabindex="0" title="Akun saya"><div class="avatar avatar-purple" id="profileAvatar">AR</div><div><b id="profileName">Aditya Rahman</b><small id="profileRole">Administrator</small></div><span class="chevron">⌄</span></div><div class="profile-popover" id="profilePopover"><small id="profileEmail"></small><button class="secondary-button" id="logoutButton" type="button">Keluar</button></div><div class="app-version" id="appVersion">build v27</div></div>
     </aside>
 
     <main class="main-content">
@@ -97,6 +98,10 @@
         <section class="panel quotation-panel"><div class="panel-heading"><div><h3>Pengiriman barang</h3><p>Surat jalan yang mengurangi stok gudang</p></div></div><div class="quotation-list" id="deliveryList"><div><div><b>Belum ada pengiriman</b></div></div></div></section>
         <section class="panel quotation-panel"><div class="panel-heading"><div><h3>Faktur & pembayaran</h3><p id="invoiceCount">Tagihan dan pelunasannya</p></div></div><div class="quotation-list" id="invoiceList"><div><div><b>Belum ada faktur</b></div></div></div></section>
       </div>
+      <div class="page-content module-view" id="vendorView" hidden>
+        <section class="module-intro"><div><p class="eyebrow">MASTER DATA · PEMASOK</p><h1>Pemasok</h1><p class="subheading">Direktori vendor beserta PIC yang terhubung ke contact.</p></div><button class="primary-button" id="addVendorPageButton"><svg><use href="#i-plus"/></svg>Tambah pemasok</button></section>
+        <section class="panel contacts-panel"><div class="panel-heading contacts-heading"><div><h3>Daftar pemasok</h3><p id="vendorDirectoryCount">Memuat data pemasok...</p></div><div class="customer-actions"><label class="asset-search"><svg><use href="#i-search"/></svg><input id="vendorDirectorySearch" type="search" placeholder="Cari nama, kontak..." /></label></div></div><div class="table-scroll"><table><thead><tr><th>VENDOR</th><th>INFO KONTAK</th><th>PIC</th><th>STATUS</th><th></th></tr></thead><tbody id="vendorDirectoryRows"><tr><td colspan="5">Memuat data pemasok dari database...</td></tr></tbody></table></div></section>
+      </div>
       <div class="page-content module-view" id="workOrderView" hidden>
         <section class="module-intro"><div><p class="eyebrow">OPERASIONAL · SERVICE ORDER</p><h1>SPK / Work Order</h1><p class="subheading">Kelola pekerjaan teknisi dari permintaan customer sampai selesai dan disetujui.</p></div><button class="primary-button" id="addWorkOrderButton"><svg><use href="#i-plus"/></svg>Buat SPK baru</button></section>
         <section class="workorder-metrics"><article class="workorder-metric"><span class="workorder-icon workorder-blue">SPK</span><div><small>Total SPK aktif</small><b>14</b><span>4 perlu ditindaklanjuti</span></div></article><article class="workorder-metric"><span class="workorder-icon workorder-orange">◷</span><div><small>Terjadwal hari ini</small><b>3</b><span class="warning-text">Menunggu teknisi</span></div></article><article class="workorder-metric"><span class="workorder-icon workorder-purple">↗</span><div><small>Dalam pengerjaan</small><b>6</b><span>Teknisi aktif</span></div></article><article class="workorder-metric"><span class="workorder-icon workorder-green">✓</span><div><small>Selesai bulan ini</small><b>22</b><span>95% tepat waktu</span></div></article></section>
@@ -130,8 +135,8 @@
   <div class="modal-backdrop" id="assetModalBackdrop"><div class="modal asset-modal"><div class="modal-header"><div><p class="eyebrow">MASTER DATA ASET</p><h2>Tambah aset genset</h2></div><button class="icon-button" id="closeAssetModal"><svg><use href="#i-close"/></svg></button></div><p class="modal-description">Simpan identitas teknis unit agar mudah dilacak dalam histori servis dan transaksi.</p><form id="assetForm"><div class="asset-form-grid"><label>No. seri genset<input required name="generatorSerial" placeholder="Contoh: RG125-2026-001" /></label><label>Type genset<select required name="generatorType"><option value="Open Type">Open Type</option><option value="Silent Type">Silent Type</option></select></label><label>Sistem operasi<select required name="operationSystem"><option value="Single Operation">Single Operation</option><option value="Synchrone Operation">Synchrone Operation</option></select></label><label>No. seri mesin<input required name="engineSerial" placeholder="Contoh: ENG-125-001" /></label><label>Type mesin<input required name="engineType" placeholder="Contoh: Cummins 6BTAA5.9" /></label><label>No. seri generator<input required name="alternatorSerial" placeholder="Contoh: ALT-125-001" /></label><label>Type generator<input required name="alternatorType" placeholder="Contoh: Stamford UCI274" /></label><label>Lokasi aset<input required name="location" placeholder="Contoh: Plant Bekasi" /></label></div><div class="modal-actions"><button type="button" class="secondary-button" id="cancelAssetModal">Batal</button><button class="primary-button" type="submit">Simpan aset</button></div></form></div></div>
   <script>window.SUPABASE_CONFIG = window.SUPABASE_CONFIG || {};</script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase-config.js?v=26"></script>
-  <script src="supabase-client.js?v=26"></script>
-  <script src="app.js?v=26"></script>
+  <script src="supabase-config.js?v=27"></script>
+  <script src="supabase-client.js?v=27"></script>
+  <script src="app.js?v=27"></script>
 </body>
 </html>

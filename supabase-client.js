@@ -265,6 +265,10 @@
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('vendor_contacts').update(payload).eq('id', id).select().single();
     },
+    async getAllVendorContacts() {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('vendor_contacts').select('vendor_id').eq('is_active', true).limit(2000);
+    },
     async getContactVendors(contactId) {
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('vendor_contacts').select('id, role, is_primary, vendors(name)').eq('contact_id', contactId).eq('is_active', true).order('created_at', { ascending: false });

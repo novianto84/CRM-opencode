@@ -325,12 +325,14 @@ $$('.nav-item').forEach((item) => item.addEventListener('click', () => {
     const isAsset = module === 'Asset';
     const isEmployee = module === 'Karyawan';
     const isCustomer = module === 'Customer';
+    const isVendor = module === 'Pemasok';
     const isSales = module === 'Transaksi';
     const isContact = module === 'Kontak';
     const isMaintenance = module === 'Maintenance';
     const isWorkOrder = module === 'SPK';
     const isInventory = module === 'Inventory';
-    $('#overviewView').hidden = isCompany || isAsset || isEmployee || isCustomer || isContact || isSales || isMaintenance || isWorkOrder || isInventory;
+    $('#overviewView').hidden = isCompany || isAsset || isEmployee || isCustomer || isContact || isVendor || isSales || isMaintenance || isWorkOrder || isInventory;
+    $('#vendorView').hidden = !isVendor;
     $('#contactView').hidden = !isContact;
     $('#salesView').hidden = !isSales;
     $('#assetView').hidden = !isAsset;
@@ -1031,6 +1033,7 @@ async function loadDatabaseData() {
   await reloadPurchaseOrders();
   await reloadSales();
   await reloadProduction();
+  await reloadVendorDirectory();
   const directoryError = await loadContactDirectory();
   const databaseErrors = [['Customer', customerResult], ['Aset', assetResult], ['Maintenance', scheduleResult], ['SPK', workOrderResult], ['Spare part', partsResult], ['Karyawan', employeeResult], ['Quotation', quotationResult]].filter(([, result]) => result.error).map(([name, result]) => `${name}: ${result.error.message}`);
   if (directoryError) databaseErrors.push(`Kontak: ${directoryError.message}`);
@@ -1607,6 +1610,11 @@ async function refreshMasters() {
       : '<div class="detail-pic"><div><b>Belum ada data</b></div></div>';
   }
 }
+$('#vendorMasterList').addEventListener('click', (event) => {
+  if (event.target.closest('.master-delete')) return;
+  const row = event.target.closest('.vendor-row');
+  if (row) { closeVendorMaster(); openVendorDetail(row.dataset.vendorId); }
+});
 masterModal.addEventListener('click', async (event) => {
   const toggle = event.target.closest('.master-toggle');
   if (toggle) {
@@ -2681,6 +2689,7 @@ vendorMasterModal.addEventListener('click', async (event) => {
   if (result.error) { showToast(`Gagal menghapus: ${result.error.message}`, true); return; }
   showToast('Pemasok dihapus.');
   await refreshVendorMaster();
+  await reloadVendorDirectory();
 });
 $('#vendorMasterForm').addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -2690,5 +2699,37 @@ $('#vendorMasterForm').addEventListener('submit', async (event) => {
   event.target.reset();
   showToast('Pemasok tersimpan.');
   await refreshVendorMaster();
+  await reloadVendorDirectory();
 });
 $('#vendorMasterButton').addEventListener('click', async () => { await refreshVendorMaster(); vendorMasterModal.classList.add('open'); });
+async function reloadVendorDirectory() {
+  if (!window.crmDb?.ready) return;
+  const [vendors, relations] = await Promise.all([window.crmDb.getVendors(), window.crmDb.getAllVendorContacts()]);
+  if (vendors.error) {
+    $('#vendorDirectoryCount').textContent = `Gagal memuat: ${vendors.error.message}`;
+    return;
+  }
+  vendorCache = vendors.data || [];
+  const counts = {};
+  (relations.data || []).forEach((rel) => { counts[rel.vendor_id] = (counts[rel.vendor_id] || 0) + 1; });
+  $('#vendorDirectoryRows').innerHTML = vendorCache.length
+    ? vendorCache.map((vendor) => {
+      const initials = vendor.name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
+      const picCount = counts[vendor.id] || 0;
+      return `<tr data-vendor-id="${vendor.id}"><td><div class="person"><div class="avatar avatar-orange">${initials}</div><div><b>${vendor.name}</b><small>${vendor.code || ''}</small></div></div></td><td>${vendor.phone || vendor.email || '-'}<br><small>${vendor.address || ''}</small></td><td><b>${picCount} PIC</b></td><td><span class="status ${vendor.is_active ? 'status-green' : 'status-gray'}">${vendor.is_active ? 'Aktif' : 'Nonaktif'}</span></td><td><button class="more-button"><svg><use href="#i-more"/></svg></button></td></tr>`;
+    }).join('')
+    : '<tr><td colspan="5">Belum ada pemasok. Klik Tambah pemasok.</td></tr>';
+  $('#vendorDirectoryCount').textContent = `${vendorCache.length} pemasok terdaftar`;
+  const navCount = $('#vendorNavCount');
+  if (navCount) navCount.textContent = vendorCache.length || '';
+}
+$('#vendorDirectoryRows').addEventListener('click', (event) => {
+  const button = event.target.closest('.more-button');
+  const row = button?.closest('tr');
+  if (row?.dataset.vendorId) openVendorDetail(row.dataset.vendorId);
+});
+$('#vendorDirectorySearch').addEventListener('input', (event) => {
+  const query = event.target.value.toLowerCase();
+  $$('#vendorDirectoryRows tr').forEach((row) => { row.hidden = !row.textContent.toLowerCase().includes(query); });
+});
+$('#addVendorPageButton').addEventListener('click', async () => { await refreshVendorMaster(); vendorMasterModal.classList.add('open'); });
