@@ -1746,6 +1746,9 @@ $('#stockForm').addEventListener('submit', async (event) => {
   if (window.crmDb?.ready) {
     if (form.get('movementType') === 'transfer') {
       if (form.get('warehouse') === form.get('destWarehouse')) { window.alert('Gudang asal dan tujuan tidak boleh sama.'); return; }
+      const stockCheck = await window.crmDb.getAllMovements();
+      const available = (stockCheck.data || []).filter((movement) => String(movement.spare_part_id) === String(form.get('part')) && String(movement.warehouse_id) === String(form.get('warehouse'))).reduce((sum, movement) => sum + (movement.movement_type === 'outbound' ? -Number(movement.quantity) : Number(movement.quantity)), 0);
+      if (Number(form.get('quantity')) > available && !window.confirm(`Stok di gudang asal hanya ${available}. Tetap transfer?`)) return;
       const transferId = window.crypto?.randomUUID ? window.crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16); });
       const out = await window.crmDb.createInventoryMovement({ spare_part_id: form.get('part'), warehouse_id: form.get('warehouse'), movement_type: 'outbound', quantity: Number(form.get('quantity')), unit_cost: Number(form.get('unitCost')) || 0, reference_type: 'transfer_out', reference_id: transferId, notes: form.get('notes') || 'Transfer antar gudang' });
       if (out.error) { window.alert(`Transfer gagal: ${out.error.message}`); return; }
@@ -1963,16 +1966,21 @@ $('#manufactureFinishForm').addEventListener('submit', async (event) => {
   if (!order) return;
   const labor = Number(form.get('laborCost')) || 0;
   const overhead = Number(form.get('overheadCost')) || 0;
+  const missingWarehouse = $$('#manufactureUsedRows .unit-conv-row').some((row) => (Number(row.querySelector('input[name="usedQty"]')?.value) || 0) > 0 && !(row.dataset.warehouse || order.warehouse_id));
+  if (missingWarehouse) { showToast('Setiap bahan terpakai harus punya gudang.', true); return; }
   let materialCost = 0;
+  const failedMaterials = [];
   for (const row of $$('#manufactureUsedRows .unit-conv-row')) {
     const used = Number(row.querySelector('input[name="usedQty"]')?.value) || 0;
     const unitCost = Number(row.dataset.cost) || 0;
     materialCost += used * unitCost;
     await window.crmDb.updateManufactureMaterial(row.dataset.material, { qty_used: used });
     if (used > 0 && row.dataset.part) {
-      await window.crmDb.createInventoryMovement({ spare_part_id: row.dataset.part, warehouse_id: row.dataset.warehouse || order.warehouse_id, movement_type: 'outbound', quantity: used, unit_cost: unitCost, reference_type: 'manufacture', reference_id: order.id, notes: `Bahan produksi ${order.order_code}` });
+      const consumed = await window.crmDb.createInventoryMovement({ spare_part_id: row.dataset.part, warehouse_id: row.dataset.warehouse || order.warehouse_id, movement_type: 'outbound', quantity: used, unit_cost: unitCost, reference_type: 'manufacture', reference_id: order.id, notes: `Bahan produksi ${order.order_code}` });
+      if (consumed.error) failedMaterials.push(row.dataset.part);
     }
   }
+  if (failedMaterials.length) { showToast(`${failedMaterials.length} bahan gagal terpotong. Produksi belum diselesaikan, ulangi lagi.`, true); return; }
   const finished = partCache.find((item) => String(item.spare_part_id) === String(order.finished_part_id));
   const unitCost = (materialCost + labor + overhead) / produced;
   if (order.finished_part_id) {
@@ -2018,7 +2026,7 @@ const renderDeliveries = (deliveries) => deliveries.slice(0, 8).map((delivery) =
 const renderInvoices = (invoices) => invoices.slice(0, 8).map((invoice) => {
   const paid = (invoice.invoice_payments || []).reduce((sum, payment) => sum + Number(payment.amount), 0);
   const status = invoice.status === 'paid' ? 'status-green' : invoice.status === 'partial' ? 'status-yellow' : invoice.status === 'cancelled' ? 'status-gray' : 'status-purple';
-  return `<div><span class="quotation-code">${invoice.invoice_code}</span><div><b>${invoice.customer_name || 'Customer'}</b><small>Jatuh tempo: ${invoice.due_date || '-'} · Dibayar ${formatRupiah(paid)} dari ${formatRupiah(invoice.total)}</small></div><strong>${formatRupiah(invoice.total)}</strong><span class="status ${status}">${invoice.status}</span>${!['paid', 'cancelled'].includes(invoice.status) ? `<button class="more-button pay-invoice" data-invoice-id="${invoice.id}" title="Catat pembayaran"><svg><use href="#i-more"/></svg></button>` : ''}${isAdmin() && invoice.status === 'unpaid' ? `<button class="icon-button cancel-invoice" data-invoice-id="${invoice.id}" title="Batalkan">✕</button>` : ''}</div>`;
+  return `<div><span class="quotation-code">${invoice.invoice_code}</span><div><b>${invoice.customer_name || 'Customer'}</b><small>Jatuh tempo: ${invoice.due_date || '-'} · Dibayar ${formatRupiah(paid)} dari ${formatRupiah(invoice.total)}</small></div><strong>${formatRupiah(invoice.total)}</strong><span class="status ${status}">${invoice.status}</span>${!['paid', 'cancelled'].includes(invoice.status) ? `<button class="more-button pay-invoice" data-invoice-id="${invoice.id}" title="Catat pembayaran"><svg><use href="#i-more"/></svg></button>` : ''}<button class="more-button print-invoice" data-invoice-id="${invoice.id}" title="Cetak faktur"><svg><use href="#i-arrow"/></svg></button>${isAdmin() && invoice.status === 'unpaid' ? `<button class="icon-button cancel-invoice" data-invoice-id="${invoice.id}" title="Batalkan">✕</button>` : ''}</div>`;
 }).join('');
 async function reloadSales() {
   if (!window.crmDb?.ready) return;
@@ -2139,6 +2147,12 @@ $('#deliveryForm').addEventListener('submit', async (event) => {
   if (!form.get('warehouse')) { showToast('Pilih gudang pengirim.', true); return; }
   const rows = $$('#deliveryItemRows .unit-conv-row').map((row) => ({ soItemId: row.dataset.soItem || null, partId: row.dataset.part || null, qty: Number(row.querySelector('input[name="deliveryQty"]')?.value) || 0 })).filter((row) => row.partId && row.qty > 0);
   if (!rows.length) { showToast('Isi qty kirim minimal satu baris.', true); return; }
+  const shortages = rows.map((row) => {
+    const part = partCache.find((item) => String(item.spare_part_id) === String(row.partId));
+    const stock = Number(part?.stock_on_hand) || 0;
+    return row.qty > stock ? `${part?.part_code || 'Part'} (minta ${row.qty}, ada ${stock})` : null;
+  }).filter(Boolean);
+  if (shortages.length && !window.confirm(`Stok tidak mencukupi:\n${shortages.join('\n')}\nTetap kirim?`)) return;
   const so = soCache.find((item) => String(item.id) === String(soId));
   const delivery = await window.crmDb.createDelivery({ sales_order_id: soId, customer_id: so?.customer_id || null, warehouse_id: form.get('warehouse'), delivery_date: form.get('deliveryDate') || null });
   if (delivery.error) { showToast(`Pengiriman gagal: ${delivery.error.message}`, true); return; }
@@ -2238,7 +2252,18 @@ $('#salesOrderList').addEventListener('click', async (event) => {
     else { showToast('Pesanan dibatalkan.'); await reloadSales(); }
   }
 });
+const printInvoice = (invoice) => {
+  if (!invoice) return;
+  const payments = invoice.invoice_payments || [];
+  const paid = payments.reduce((sum, payment) => sum + Number(payment.amount), 0);
+  const printWindow = window.open('', '_blank', 'width=900,height=700');
+  if (!printWindow) return;
+  printWindow.document.write(`<title>${invoice.invoice_code}</title><style>body{font:14px Arial;color:#182235;max-width:800px;margin:40px auto}h1{margin-bottom:4px}table{width:100%;border-collapse:collapse;margin-top:28px}th,td{padding:10px;border-bottom:1px solid #ddd;text-align:left}td:last-child,th:last-child{text-align:right}.total{text-align:right;font-size:18px;font-weight:bold;margin-top:20px}.subtotal{text-align:right;color:#555;margin-top:20px}</style><h1>Faktur ${invoice.invoice_code}</h1><p>Customer: <b>${invoice.customer_name || '-'}</b><br>Terbit: ${invoice.issue_date || '-'} · Jatuh tempo: ${invoice.due_date || '-'}</p><p class="subtotal">Subtotal: ${formatRupiah(invoice.subtotal)}${Number(invoice.tax) > 0 ? `<br>PPN: ${formatRupiah(invoice.tax)}` : ''}</p><p class="total">Total: ${formatRupiah(invoice.total)}</p><p>Dibayar: ${formatRupiah(paid)} · Sisa: ${formatRupiah(Number(invoice.total) - paid)}</p><table><thead><tr><th>Tanggal</th><th>Metode</th><th>Jumlah</th></tr></thead><tbody>${payments.map((payment) => `<tr><td>${payment.paid_date || ''}</td><td>${payment.method || '-'}</td><td>${formatRupiah(payment.amount)}</td></tr>`).join('') || '<tr><td colspan="3">Belum ada pembayaran.</td></tr>'}</tbody></table>`);
+  printWindow.document.close(); printWindow.focus(); printWindow.print();
+};
 $('#invoiceList').addEventListener('click', async (event) => {
+  const print = event.target.closest('.print-invoice');
+  if (print) { printInvoice(invoiceCache.find((item) => String(item.id) === String(print.dataset.invoiceId))); return; }
   const pay = event.target.closest('.pay-invoice');
   if (pay) { openPaymentModal(pay.dataset.invoiceId); return; }
   const cancel = event.target.closest('.cancel-invoice');
@@ -2256,7 +2281,7 @@ $('#deliveryList').addEventListener('click', (event) => {
   const items = delivery.delivery_items || [];
   const printWindow = window.open('', '_blank', 'width=900,height=700');
   if (!printWindow) return;
-  printWindow.document.write(`<title>${delivery.delivery_code}</title><style>body{font:14px Arial;color:#182235;max-width:800px;margin:40px auto}h1{margin-bottom:4px}table{width:100%;border-collapse:collapse;margin-top:28px}th,td{padding:10px;border-bottom:1px solid #ddd;text-align:left}</style><h1>Surat Jalan ${delivery.delivery_code}</h1><p>Tanggal: ${delivery.delivery_date || '-'}</p><table><thead><tr><th>Barang</th><th>Qty</th></tr></thead><tbody>${items.map((item) => `<tr><td>${item.spare_part_id}</td><td>${item.quantity}</td></tr>`).join('')}</tbody></table>`);
+  printWindow.document.write(`<title>${delivery.delivery_code}</title><style>body{font:14px Arial;color:#182235;max-width:800px;margin:40px auto}h1{margin-bottom:4px}table{width:100%;border-collapse:collapse;margin-top:28px}th,td{padding:10px;border-bottom:1px solid #ddd;text-align:left}</style><h1>Surat Jalan ${delivery.delivery_code}</h1><p>Tanggal: ${delivery.delivery_date || '-'}</p><table><thead><tr><th>Barang</th><th>Qty</th></tr></thead><tbody>${items.map((item) => { const part = partCache.find((candidate) => String(candidate.spare_part_id) === String(item.spare_part_id)); return `<tr><td>${part ? `${part.part_code} · ${part.name}` : (item.spare_part_id || '-')}</td><td>${item.quantity}</td></tr>`; }).join('')}</tbody></table>`);
   printWindow.document.close(); printWindow.focus(); printWindow.print();
 });
 let poCache = [];
@@ -2387,7 +2412,8 @@ $('#receiptForm').addEventListener('submit', async (event) => {
     cost: Number(row.querySelector('input[name="receiptCost"]')?.value) || 0
   })).filter((row) => row.partId && row.qty > 0);
   if (!rows.length) { showToast('Isi qty terima minimal satu baris.', true); return; }
-  await window.crmDb.createGoodsReceiptItems(rows.map((row) => ({ receipt_id: receipt.data.id, purchase_order_item_id: row.poItemId, spare_part_id: row.partId, quantity: row.qty, unit_cost: row.cost })));
+  const receiptItems = await window.crmDb.createGoodsReceiptItems(rows.map((row) => ({ receipt_id: receipt.data.id, purchase_order_item_id: row.poItemId, spare_part_id: row.partId, quantity: row.qty, unit_cost: row.cost })));
+  if (receiptItems.error) { showToast(`Item penerimaan gagal, stok belum diubah: ${receiptItems.error.message}`, true); return; }
   for (const row of rows) {
     await window.crmDb.createInventoryMovement({ spare_part_id: row.partId, warehouse_id: form.get('warehouse'), movement_type: 'inbound', quantity: row.qty, unit_cost: row.cost, reference_type: 'purchase_receipt', reference_id: receipt.data.id, notes: `Penerimaan ${receipt.data.receipt_code}` });
     await window.crmDb.updateSparePart(row.partId, { last_purchase_price: row.cost, last_purchase_date: form.get('receivedDate') || new Date().toISOString().slice(0, 10) });
@@ -2479,7 +2505,8 @@ const opnameSystemQty = {};
 async function openOpnameModal() {
   const [warehouses, movements] = await Promise.all([window.crmDb.getWarehouses(), window.crmDb.getAllMovements()]);
   if (warehouses.error || movements.error) { showToast(`Gagal memuat: ${(warehouses.error || movements.error).message}`, true); return; }
-  $('#opnameWarehouseSelect').innerHTML = '<option value="">Semua gudang</option>' + (warehouses.data || []).map((w) => `<option value="${w.id}">${w.name}</option>`).join('');
+  if (!(warehouses.data || []).length) { showToast('Belum ada gudang. Tambahkan gudang dulu.', true); return; }
+  $('#opnameWarehouseSelect').innerHTML = (warehouses.data || []).map((w) => `<option value="${w.id}">${w.name}</option>`).join('');
   const renderOpnameRows = () => {
     const warehouseId = $('#opnameWarehouseSelect').value;
     Object.keys(opnameSystemQty).forEach((key) => delete opnameSystemQty[key]);
