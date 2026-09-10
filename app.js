@@ -1191,7 +1191,16 @@ $('#addUnitRowButton').addEventListener('click', () => {
   row.querySelector('.remove-unit-row').addEventListener('click', () => row.remove());
   $('#unitConversionRows').append(row);
 });
-$('#addPartButton').addEventListener('click', async () => { await refreshPartMasters(); applyTwoColumn(partModal, 660); partModal.classList.add('open'); });
+$('#addPartButton').addEventListener('click', async () => {
+  editingPartId = null;
+  $('#partForm').reset();
+  $('#unitConversionRows').innerHTML = '';
+  setPartOpeningVisible(true);
+  partModal.querySelector('h2').textContent = 'Tambah spare part';
+  await refreshPartMasters();
+  applyTwoColumn(partModal, 660);
+  partModal.classList.add('open');
+});
 $('#closePartModal').addEventListener('click', closePartModal);
 $('#cancelPartModal').addEventListener('click', closePartModal);
 partModal.addEventListener('click', (event) => { if (event.target === partModal) closePartModal(); });
@@ -1208,6 +1217,40 @@ $('#partForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = new FormData(event.target);
   let newPartId = null;
+  if (window.crmDb?.ready && editingPartId) {
+    const payload = { part_code: form.get('partCode'), name: form.get('name'), item_type: form.get('itemType') || 'stock', brand: form.get('brand') || null, category: form.get('category') || null, unit: form.get('unit') || 'pcs', minimum_stock: Number(form.get('minimumStock')), weight_kg: Number(form.get('weight')) || null, length_cm: Number(form.get('length')) || null, width_cm: Number(form.get('width')) || null, height_cm: Number(form.get('height')) || null, list_price: Number(form.get('listPrice')) || 0, default_discount_pct: Number(form.get('discountPct')) || 0, min_sell_qty: Number(form.get('minSell')) || 1, ppn_rate: Number(form.get('ppnRate')) || 0, ref_tax_code: form.get('refTax') || null, last_purchase_price: Number(form.get('lastPurchasePrice')) || null, last_purchase_date: form.get('lastPurchaseDate') || null, specification: form.get('specification') || null, compatible_models: form.get('compatibleModels') || null };
+    const updated = await window.crmDb.updateSparePart(editingPartId, payload);
+    if (updated.error) { showToast(`Part belum tersimpan: ${updated.error.message}`, true); return; }
+    const photoFile = form.get('photo');
+    if (photoFile?.size) {
+      const upload = await window.crmDb.uploadItemPhoto(editingPartId, photoFile);
+      if (!upload.error) await window.crmDb.updateSparePart(editingPartId, { photo_url: upload.data.publicUrl });
+    }
+    const existingUnits = await window.crmDb.getItemUnits(editingPartId);
+    for (const unit of existingUnits.data || []) await window.crmDb.deleteItemUnit(unit.id);
+    await window.crmDb.createItemUnit({ spare_part_id: editingPartId, unit: payload.unit, conversion_to_base: 1, sale_price: payload.list_price });
+    for (const row of $$('#unitConversionRows .unit-conv-row')) {
+      const unit = row.querySelector('input[name="convUnit"]')?.value.trim();
+      const rate = Number(row.querySelector('input[name="convRate"]')?.value);
+      if (!unit || !(rate > 0)) continue;
+      await window.crmDb.createUnit({ code: unit, name: unit });
+      await window.crmDb.createItemUnit({ spare_part_id: editingPartId, unit, conversion_to_base: rate, sale_price: Number(row.querySelector('input[name="convPrice"]')?.value) || 0 });
+    }
+    const refreshed = await window.crmDb.getSpareParts();
+    if (!refreshed.error && refreshed.data) {
+      partCache = refreshed.data;
+      $('#partRows').innerHTML = renderDbPartRows(partCache);
+      $('#partCount').textContent = `${partCache.length} dari ${partCache.length}`;
+      bindPartRowButtons();
+      refreshInventoryMetrics();
+    }
+    event.target.reset();
+    $('#unitConversionRows').innerHTML = '';
+    closePartModal();
+    showToast('Spare part berhasil diperbarui.');
+    editingPartId = null;
+    return;
+  }
   if (window.crmDb?.ready) {
     const categoryName = form.get('category') || null;
     const brandName = form.get('brand') || null;
@@ -1262,8 +1305,97 @@ function bindPartRowButtons() {
   $$('#partRows .more-button').forEach((button) => {
     if (button.dataset.bound) return;
     button.dataset.bound = '1';
-    button.addEventListener('click', () => openVendorModal(button.closest('tr')?.dataset.sparePartId, button.closest('tr')?.querySelector('.part-code')?.textContent));
+    button.addEventListener('click', () => openPartDetail(button.closest('tr')?.dataset.sparePartId));
   });
+}
+let editingPartId = null;
+const partDetailModal = document.createElement('div');
+partDetailModal.className = 'modal-backdrop';
+partDetailModal.innerHTML = '<div class="modal relation-modal"><div class="modal-header"><div><p class="eyebrow">DETAIL SPARE PART</p><h2 id="partDetailName">Spare part</h2><p class="detail-subtitle" id="partDetailCode"></p></div><button class="icon-button" id="closePartDetail"><svg><use href="#i-close"/></svg></button></div><div class="company-logo" id="partDetailPhoto"></div><div class="customer-contact-list" id="partDetailInfo"></div><div class="modal-actions"><button class="secondary-button" id="partStockCardButton" type="button">Kartu stok</button><button class="secondary-button" id="partVendorButton" type="button">Harga vendor</button><button class="primary-button" id="partEditButton" type="button">Edit part</button></div></div>';
+document.body.append(partDetailModal);
+applyTwoColumn(partDetailModal, 680);
+const closePartDetail = () => partDetailModal.classList.remove('open');
+$('#closePartDetail').addEventListener('click', closePartDetail);
+partDetailModal.addEventListener('click', (event) => { if (event.target === partDetailModal) closePartDetail(); });
+let activePartDetailId = null;
+async function openPartDetail(sparePartId) {
+  if (!window.crmDb?.ready || !sparePartId) { showToast('Pilih spare part dari database.', true); return; }
+  const [partResult, unitsResult] = await Promise.all([window.crmDb.getSparePart(sparePartId), window.crmDb.getItemUnits(sparePartId)]);
+  if (partResult.error) { showToast(`Detail part gagal dimuat: ${partResult.error.message}`, true); return; }
+  const part = partResult.data;
+  activePartDetailId = part.id;
+  const cached = partCache.find((item) => String(item.spare_part_id) === String(part.id));
+  const typeLabels = { stock: 'Persediaan', non_stock: 'Non Persediaan', service: 'Jasa', group: 'Grup' };
+  $('#partDetailName').textContent = part.name;
+  $('#partDetailCode').textContent = `${part.part_code} · ${typeLabels[part.item_type] || ''}`;
+  $('#partDetailPhoto').innerHTML = `<span${part.photo_url ? ` style="background-image:url('${part.photo_url}');background-size:cover;color:transparent"` : ''}>${(part.name || '?').slice(0, 1).toUpperCase()}</span><div><b>Foto produk</b><small>${part.brand || ''} ${part.category || ''}</small></div>`;
+  const units = (unitsResult.data || []).filter((u) => Number(u.conversion_to_base) !== 1);
+  $('#partDetailInfo').innerHTML = [
+    ['Satuan dasar', part.unit],
+    units.length ? ['Konversi', units.map((u) => `1 ${u.unit} = ${u.conversion_to_base} ${part.unit}`).join(', ')] : null,
+    ['Dimensi', [part.length_cm, part.width_cm, part.height_cm].some((dim) => Number(dim) > 0) ? `${part.length_cm || '-'} × ${part.width_cm || '-'} × ${part.height_cm || '-'} cm` : null],
+    ['Berat', part.weight_kg ? `${part.weight_kg} kg` : null],
+    ['Pricelist', part.list_price ? formatRupiah(part.list_price) : null],
+    ['Beli terakhir', part.last_purchase_price ? `${formatRupiah(part.last_purchase_price)}${part.last_purchase_date ? ` · ${part.last_purchase_date}` : ''}` : null],
+    ['Stok', cached ? `${cached.stock_on_hand} ${part.unit} (min. ${cached.minimum_stock})` : null],
+    ['Spesifikasi', part.specification || null]
+  ].filter((row) => row && row[1]).map(([label, value]) => `<div class="detail-pic"><div><b>${label}</b><small>${value}</small></div></div>`).join('') || '<div class="detail-pic"><div><b>Belum ada detail</b></div></div>';
+  partDetailModal.classList.add('open');
+}
+$('#partEditButton').addEventListener('click', () => { closePartDetail(); openPartEditor(activePartDetailId); });
+$('#partVendorButton').addEventListener('click', async () => {
+  const part = partCache.find((item) => String(item.spare_part_id) === String(activePartDetailId));
+  closePartDetail();
+  await openVendorModal(activePartDetailId, part?.part_code);
+});
+$('#partStockCardButton').addEventListener('click', () => { closePartDetail(); openStockCard(activePartDetailId); });
+const setPartOpeningVisible = (visible) => {
+  ['openingWarehouse', 'openingQty', 'openingCost'].forEach((name) => {
+    const label = $(`#partForm input[name="${name}"], #partForm select[name="${name}"]`)?.closest('label');
+    if (label) label.hidden = !visible;
+  });
+};
+async function openPartEditor(sparePartId) {
+  const [partResult, unitsResult] = await Promise.all([window.crmDb.getSparePart(sparePartId), window.crmDb.getItemUnits(sparePartId)]);
+  if (partResult.error) { showToast(`Data part gagal dimuat: ${partResult.error.message}`, true); return; }
+  const part = partResult.data;
+  editingPartId = part.id;
+  const set = (name, value) => { const el = $(`#partForm input[name="${name}"], #partForm select[name="${name}"]`); if (el) el.value = value ?? ''; };
+  set('partCode', part.part_code);
+  set('name', part.full_name || part.name);
+  set('itemType', part.item_type || 'stock');
+  set('category', part.category || '');
+  set('brand', part.brand || '');
+  set('unit', part.unit || 'pcs');
+  set('minimumStock', part.minimum_stock ?? 0);
+  set('listPrice', part.list_price || '');
+  set('discountPct', part.default_discount_pct || '');
+  set('minSell', part.min_sell_qty ?? '');
+  set('ppnRate', part.ppn_rate || '');
+  set('refTax', part.ref_tax_code || '');
+  set('weight', part.weight_kg || '');
+  set('length', part.length_cm || '');
+  set('width', part.width_cm || '');
+  set('height', part.height_cm || '');
+  set('lastPurchasePrice', part.last_purchase_price || '');
+  set('lastPurchaseDate', part.last_purchase_date || '');
+  set('specification', part.specification || '');
+  set('compatibleModels', part.compatible_models || '');
+  $('#unitConversionRows').innerHTML = '';
+  (unitsResult.data || []).filter((u) => Number(u.conversion_to_base) !== 1).forEach((u) => {
+    $('#addUnitRowButton').click();
+    const row = $('#unitConversionRows .unit-conv-row:last-child');
+    if (row) {
+      row.querySelector('input[name="convUnit"]').value = u.unit;
+      row.querySelector('input[name="convRate"]').value = u.conversion_to_base;
+      row.querySelector('input[name="convPrice"]').value = u.sale_price || '';
+      row.dataset.unitId = u.id;
+    }
+  });
+  setPartOpeningVisible(false);
+  partModal.querySelector('h2').textContent = 'Edit spare part';
+  await refreshPartMasters();
+  partModal.classList.add('open');
 }
 let activeVendorPartId = null;
 const vendorModal = document.createElement('div');

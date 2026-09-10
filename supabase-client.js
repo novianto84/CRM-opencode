@@ -169,6 +169,14 @@
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('spare_parts').insert(payload).select().single();
     },
+    async getSparePart(id) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('spare_parts').select('*').eq('id', id).single();
+    },
+    async deleteItemUnit(id) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('item_units').delete().eq('id', id);
+    },
     async updateSparePart(id, payload) {
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('spare_parts').update(payload).eq('id', id).select().single();
