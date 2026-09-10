@@ -30,6 +30,7 @@ Profil customer dan logo tersedia di `supabase/migrations/004_customer_profile.s
 20. Jalankan query `supabase/migrations/016_serial_numbers.sql` untuk pelacakan nomor seri/batch dan tanggal kadaluarsa.
 21. Jalankan query `supabase/migrations/017_item_requests.sql` untuk permintaan barang.
 22. Jalankan query `supabase/migrations/018_manufacturing_pricing.sql` untuk produksi dan penyesuaian harga global.
+23. Jalankan query `supabase/migrations/019_vendor_contacts.sql` untuk daftar PIC vendor dari direktori contact.
 
 ## Struktur Utama
 

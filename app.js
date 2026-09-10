@@ -174,7 +174,7 @@ async function reloadContactDirectory() {
 }
 const contactEditorModal = document.createElement('div');
 contactEditorModal.className = 'modal-backdrop';
-contactEditorModal.innerHTML = '<div class="modal relation-modal"><div class="modal-header"><div><p class="eyebrow">CONTACT DETAIL</p><h2>Edit contact</h2></div><button class="icon-button" id="closeContactEditor"><svg><use href="#i-close"/></svg></button></div><div class="company-logo" id="contactPhotoPreviewWrap"><span id="contactPhotoPreview">?</span><div><b>Foto profil</b><small id="contactPhotoNote">Belum ada foto</small></div></div><form id="contactEditorForm"><label>Nama lengkap<input required name="name" placeholder="Nama lengkap" /></label><label>Jabatan<input name="position" placeholder="Jabatan" /></label><label>Handphone 1<input name="phone" placeholder="0812 0000 0000" /></label><label>Handphone 2<input name="phone2" placeholder="Nomor kedua" /></label><label>Email 1<input type="email" name="email" placeholder="email@customer.com" /></label><label>Email 2<input type="email" name="email2" placeholder="Email kedua (opsional)" /></label><label>Foto profil<input type="file" name="photo" accept="image/png,image/jpeg,image/webp" /></label><label>Nomor identitas<input name="identityNumber" placeholder="KTP / identitas lain" /></label><label>Tanggal lahir<input type="date" name="birthDate" /></label><label>Alamat<input name="contactAddress" placeholder="Alamat tinggal" /></label><label>Catatan<textarea name="contactNotes" rows="2" placeholder="Catatan tambahan"></textarea></label><div class="detail-section-heading"><h3>Customer terhubung</h3></div><div class="customer-contact-list" id="contactCustomerLinks"></div><div class="modal-actions"><button type="button" class="secondary-button" id="cancelContactEditor">Batal</button><button class="primary-button" type="submit">Simpan perubahan</button></div></form></div>';
+contactEditorModal.innerHTML = '<div class="modal relation-modal"><div class="modal-header"><div><p class="eyebrow">CONTACT DETAIL</p><h2>Edit contact</h2></div><button class="icon-button" id="closeContactEditor"><svg><use href="#i-close"/></svg></button></div><div class="company-logo" id="contactPhotoPreviewWrap"><span id="contactPhotoPreview">?</span><div><b>Foto profil</b><small id="contactPhotoNote">Belum ada foto</small></div></div><form id="contactEditorForm"><label>Nama lengkap<input required name="name" placeholder="Nama lengkap" /></label><label>Jabatan<input name="position" placeholder="Jabatan" /></label><label>Handphone 1<input name="phone" placeholder="0812 0000 0000" /></label><label>Handphone 2<input name="phone2" placeholder="Nomor kedua" /></label><label>Email 1<input type="email" name="email" placeholder="email@customer.com" /></label><label>Email 2<input type="email" name="email2" placeholder="Email kedua (opsional)" /></label><label>Foto profil<input type="file" name="photo" accept="image/png,image/jpeg,image/webp" /></label><label>Nomor identitas<input name="identityNumber" placeholder="KTP / identitas lain" /></label><label>Tanggal lahir<input type="date" name="birthDate" /></label><label>Alamat<input name="contactAddress" placeholder="Alamat tinggal" /></label><label>Catatan<textarea name="contactNotes" rows="2" placeholder="Catatan tambahan"></textarea></label><div class="detail-section-heading"><h3>Customer terhubung</h3></div><div class="customer-contact-list" id="contactCustomerLinks"></div><div class="detail-section-heading"><h3>Vendor terhubung</h3></div><div class="customer-contact-list" id="contactVendorLinks"></div><div class="modal-actions"><button type="button" class="secondary-button" id="cancelContactEditor">Batal</button><button class="primary-button" type="submit">Simpan perubahan</button></div></form></div>';
 document.body.append(contactEditorModal);
 applyTwoColumn(contactEditorModal, 680);
 let editingContactId = null;
@@ -184,7 +184,7 @@ $('#cancelContactEditor').addEventListener('click', closeContactEditor);
 contactEditorModal.addEventListener('click', (event) => { if (event.target === contactEditorModal) closeContactEditor(); });
 async function openContactEditor(contactId) {
   if (!window.crmDb?.ready || !contactId) { showToast('Data demo tidak dapat diedit.', true); return; }
-  const [contactResult, linksResult] = await Promise.all([window.crmDb.getContact(contactId), window.crmDb.getContactCustomers(contactId)]);
+  const [contactResult, linksResult, vendorLinksResult] = await Promise.all([window.crmDb.getContact(contactId), window.crmDb.getContactCustomers(contactId), window.crmDb.getContactVendors(contactId)]);
   if (contactResult.error) { showToast(`Data contact gagal dimuat: ${contactResult.error.message}`, true); return; }
   const contact = contactResult.data;
   editingContactId = contact.id;
@@ -214,6 +214,10 @@ async function openContactEditor(contactId) {
   $('#contactCustomerLinks').innerHTML = links.length
     ? links.map((link) => `<div class="detail-pic"><div><b>${link.customers?.name || '-'}</b><small>${link.role || 'PIC'}${link.is_primary ? ' · Utama' : ''}</small></div>${isAdmin() ? `<button class="icon-button delete-pic" data-relation-id="${link.id}" data-pic-name="${contact.full_name}" title="Lepaskan dari customer">✕</button>` : ''}</div>`).join('')
     : '<div class="detail-pic"><div><b>Belum terhubung</b><small>Hubungkan via detail customer</small></div></div>';
+  const vendorLinks = vendorLinksResult.data || [];
+  $('#contactVendorLinks').innerHTML = vendorLinks.length
+    ? vendorLinks.map((link) => `<div class="detail-pic"><div><b>${link.vendors?.name || '-'}</b><small>${link.role || 'PIC Vendor'}${link.is_primary ? ' · Utama' : ''}</small></div>${isAdmin() ? `<button class="icon-button delete-vendor-link" data-relation-id="${link.id}" data-pic-name="${contact.full_name}" title="Lepaskan dari vendor">✕</button>` : ''}</div>`).join('')
+    : '<div class="detail-pic"><div><b>Belum terhubung</b><small>Hubungkan via detail vendor</small></div></div>';
   contactEditorModal.classList.add('open');
 }
 const handleDirectoryClick = (event) => {
@@ -234,6 +238,17 @@ $('#contactCustomerLinks').addEventListener('click', async (event) => {
   if (!isAdmin()) { showToast('Hanya administrator yang dapat melepas relasi.', true); return; }
   if (!window.confirm(`Lepaskan ${button.dataset.picName} dari customer ini?`)) return;
   const result = await window.crmDb.updateCustomerContact(button.dataset.relationId, { is_active: false });
+  if (result.error) { showToast(`Relasi gagal dilepas: ${result.error.message}`, true); return; }
+  showToast('Relasi berhasil dilepas.');
+  closeContactEditor();
+  await reloadContactDirectory();
+});
+$('#contactVendorLinks').addEventListener('click', async (event) => {
+  const button = event.target.closest('.delete-vendor-link');
+  if (!button) return;
+  if (!isAdmin()) { showToast('Hanya administrator yang dapat melepas relasi.', true); return; }
+  if (!window.confirm(`Lepaskan ${button.dataset.picName} dari vendor ini?`)) return;
+  const result = await window.crmDb.updateVendorContact(button.dataset.relationId, { is_active: false });
   if (result.error) { showToast(`Relasi gagal dilepas: ${result.error.message}`, true); return; }
   showToast('Relasi berhasil dilepas.');
   closeContactEditor();
@@ -2567,15 +2582,96 @@ const closeVendorMaster = () => vendorMasterModal.classList.remove('open');
 $('#closeVendorMaster').addEventListener('click', closeVendorMaster);
 $('#cancelVendorMaster').addEventListener('click', closeVendorMaster);
 vendorMasterModal.addEventListener('click', (event) => { if (event.target === vendorMasterModal) closeVendorMaster(); });
+let vendorCache = [];
 async function refreshVendorMaster() {
   const result = await window.crmDb.getVendors();
   if (result.error) return;
-  $('#vendorMasterList').innerHTML = result.data?.length
-    ? result.data.map((vendor) => `<div class="detail-pic"><div><b>${vendor.name}</b><small>${vendor.phone || vendor.email || '-'}</small></div>${isAdmin() ? `<button class="icon-button master-delete" data-id="${vendor.id}" data-name="${vendor.name}" title="Hapus">✕</button>` : ''}</div>`).join('')
+  vendorCache = result.data || [];
+  $('#vendorMasterList').innerHTML = vendorCache.length
+    ? vendorCache.map((vendor) => `<div class="detail-pic vendor-row" data-vendor-id="${vendor.id}"><div><b>${vendor.name}</b><small>${vendor.phone || vendor.email || 'Klik untuk PIC & detail'}</small></div>${isAdmin() ? `<button class="icon-button master-delete" data-id="${vendor.id}" data-name="${vendor.name}" title="Hapus">✕</button>` : ''}</div>`).join('')
     : '<div class="detail-pic"><div><b>Belum ada pemasok</b></div></div>';
   const datalist = $('#vendorDatalist');
-  if (datalist) datalist.innerHTML = (result.data || []).map((vendor) => `<option value="${vendor.name}">`).join('');
+  if (datalist) datalist.innerHTML = vendorCache.map((vendor) => `<option value="${vendor.name}">`).join('');
 }
+let activeVendorId = null;
+const vendorDetailModal = document.createElement('div');
+vendorDetailModal.className = 'modal-backdrop';
+vendorDetailModal.innerHTML = '<div class="modal relation-modal"><div class="modal-header"><div><p class="eyebrow">VENDOR DETAIL</p><h2 id="vendorDetailName">Pemasok</h2><p class="detail-subtitle" id="vendorDetailInfo"></p></div><button class="icon-button" id="closeVendorDetail"><svg><use href="#i-close"/></svg></button></div><div class="detail-section-heading"><h3>PIC vendor</h3><button class="text-button" id="addVendorPicButton">+ Tambah PIC</button></div><div class="customer-contact-list" id="vendorContactList"></div><form id="vendorPicForm" hidden><label>Gunakan contact yang sudah ada<select name="existingContact" id="vendorExistingContact"><option value="">-- Buat contact baru --</option></select></label><label>Nama PIC<input required name="name" placeholder="Nama lengkap" /></label><label>Peran PIC<input name="role" placeholder="Contoh: Sales, Finance" /></label><label>No. telepon<input name="phone" placeholder="0812 0000 0000" /></label><label>Email<input type="email" name="email" placeholder="email@vendor.com" /></label><div class="modal-actions"><button class="primary-button" type="submit">Simpan PIC</button></div></form><div class="modal-actions"><button class="primary-button" id="closeVendorDetailButton" type="button">Tutup</button></div></div>';
+document.body.append(vendorDetailModal);
+applyTwoColumn(vendorDetailModal, 680);
+const closeVendorDetail = () => vendorDetailModal.classList.remove('open');
+$('#closeVendorDetail').addEventListener('click', closeVendorDetail);
+$('#closeVendorDetailButton').addEventListener('click', closeVendorDetail);
+vendorDetailModal.addEventListener('click', (event) => { if (event.target === vendorDetailModal) closeVendorDetail(); });
+async function openVendorDetail(vendorId) {
+  const vendor = vendorCache.find((item) => String(item.id) === String(vendorId));
+  if (!vendor) return;
+  activeVendorId = vendor.id;
+  $('#vendorDetailName').textContent = vendor.name;
+  $('#vendorDetailInfo').textContent = [vendor.phone, vendor.email, vendor.address].filter(Boolean).join(' · ') || 'Belum ada info kontak';
+  $('#vendorPicForm').hidden = true;
+  await reloadVendorContacts();
+  vendorDetailModal.classList.add('open');
+}
+async function reloadVendorContacts() {
+  if (!activeVendorId) return;
+  const result = await window.crmDb.getVendorContacts(activeVendorId);
+  const list = result.data || [];
+  $('#vendorContactList').innerHTML = list.length
+    ? list.map((rel) => {
+      const person = rel.contacts || rel;
+      const initials = (person.full_name || '?').split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
+      return `<div class="detail-pic"><div class="avatar avatar-green">${initials}</div><div><b>${person.full_name}</b><small>${rel.role || person.position || 'PIC Vendor'}</small><small>${person.phone || person.email || '-'}</small></div>${rel.is_primary ? '<span class="status status-green">Utama</span>' : ''}${isAdmin() ? `<button class="icon-button delete-vendor-pic" data-relation-id="${rel.id}" data-pic-name="${person.full_name}" title="Hapus PIC">✕</button>` : ''}</div>`;
+    }).join('')
+    : '<div class="detail-pic"><div><b>Belum ada PIC</b><small>Tambahkan dari daftar kontak</small></div></div>';
+}
+$('#vendorMasterList').addEventListener('click', (event) => {
+  if (event.target.closest('.master-delete')) return;
+  const row = event.target.closest('.vendor-row');
+  if (row) openVendorDetail(row.dataset.vendorId);
+});
+$('#addVendorPicButton').addEventListener('click', async () => {
+  const contactsResult = await window.crmDb.getContacts();
+  $('#vendorExistingContact').innerHTML = '<option value="">-- Buat contact baru --</option>' + (contactsResult.data || []).map((c) => `<option value="${c.id}">${c.full_name}${c.phone ? ` · ${c.phone}` : ''}</option>`).join('');
+  $('#vendorPicForm').hidden = !$('#vendorPicForm').hidden;
+});
+$('#vendorExistingContact').addEventListener('change', (event) => {
+  $('#vendorPicForm input[name="name"]').required = !event.target.value;
+});
+$('#vendorPicForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = new FormData(event.target);
+  const existingId = form.get('existingContact');
+  const existing = await window.crmDb.getVendorContacts(activeVendorId);
+  if (existing.error) { showToast(`Data PIC gagal diperiksa: ${existing.error.message}`, true); return; }
+  let result;
+  if (existingId) {
+    if (existing.data?.some((rel) => rel.contact_id === existingId)) { showToast('Contact sudah terhubung ke vendor ini.', true); return; }
+    const contactsResult = await window.crmDb.getContacts();
+    const picked = contactsResult.data?.find((c) => String(c.id) === String(existingId));
+    result = await window.crmDb.createVendorContactRelation({ vendor_id: activeVendorId, contact_id: existingId, full_name: picked?.full_name || 'Contact', position: picked?.position || null, phone: picked?.phone || null, email: picked?.email || null, role: form.get('role') || null });
+  } else {
+    const newName = String(form.get('name') || '').trim();
+    if (!newName) { showToast('Isi nama PIC.', true); return; }
+    const contact = await window.crmDb.createContact({ full_name: newName, phone: form.get('phone') || null, email: form.get('email') || null });
+    result = contact.error ? contact : await window.crmDb.createVendorContactRelation({ vendor_id: activeVendorId, contact_id: contact.data.id, full_name: contact.data.full_name, phone: contact.data.phone, email: contact.data.email, role: form.get('role') || null });
+  }
+  if (result.error) { showToast(`PIC belum tersimpan: ${result.error.message}`, true); return; }
+  event.target.reset();
+  $('#vendorPicForm').hidden = true;
+  showToast('PIC vendor ditambahkan.');
+  await reloadVendorContacts();
+});
+$('#vendorContactList').addEventListener('click', async (event) => {
+  const button = event.target.closest('.delete-vendor-pic');
+  if (!button) return;
+  if (!isAdmin()) { showToast('Hanya administrator yang dapat menghapus PIC.', true); return; }
+  if (!window.confirm(`Hapus ${button.dataset.picName} dari vendor ini? Data contact tetap tersimpan.`)) return;
+  const result = await window.crmDb.updateVendorContact(button.dataset.relationId, { is_active: false });
+  if (result.error) { showToast(`Gagal menghapus: ${result.error.message}`, true); return; }
+  showToast('PIC vendor dihapus.');
+  await reloadVendorContacts();
+});
 vendorMasterModal.addEventListener('click', async (event) => {
   const button = event.target.closest('.master-delete');
   if (!button) return;

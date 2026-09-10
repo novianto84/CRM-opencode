@@ -514,6 +514,23 @@ create table public.invoice_payments (
   created_at timestamptz not null default now()
 );
 
+create table public.vendor_contacts (
+  id uuid primary key default gen_random_uuid(),
+  vendor_id uuid not null references public.vendors(id) on delete cascade,
+  contact_id uuid references public.contacts(id) on delete restrict,
+  contact_code text not null unique default ('VCP-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 6))),
+  full_name text not null,
+  position text,
+  phone text,
+  email text,
+  role text,
+  notes text,
+  is_primary boolean not null default false,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table public.serial_numbers (
   id uuid primary key default gen_random_uuid(),
   spare_part_id uuid not null references public.spare_parts(id) on delete cascade,
@@ -734,7 +751,7 @@ begin
     'units', 'item_units', 'spare_part_bundle_items', 'warehouses', 'vendors', 'stock_opname_orders',
     'stock_opname_items', 'item_price_tiers', 'item_substitutes', 'purchase_orders', 'purchase_order_items',
     'goods_receipts', 'goods_receipt_items', 'sales_orders', 'sales_order_items', 'delivery_orders',
-    'delivery_items', 'sales_invoices', 'invoice_payments', 'serial_numbers', 'item_requests', 'item_request_items',
+    'delivery_items', 'sales_invoices', 'invoice_payments', 'serial_numbers', 'vendor_contacts', 'item_requests', 'item_request_items',
     'manufacture_orders', 'manufacture_materials', 'price_adjustments', 'maintenance_parts', 'audit_logs'
   ] loop
     execute format('alter table public.%I enable row level security', table_name);

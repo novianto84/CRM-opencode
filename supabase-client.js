@@ -253,6 +253,22 @@
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('vendors').delete().eq('id', id);
     },
+    async getVendorContacts(vendorId) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('vendor_contacts').select('*, contacts!vendor_contacts_contact_id_fkey(*)').eq('vendor_id', vendorId).eq('is_active', true).order('is_primary', { ascending: false });
+    },
+    async createVendorContactRelation(payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('vendor_contacts').insert(payload).select().single();
+    },
+    async updateVendorContact(id, payload) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('vendor_contacts').update(payload).eq('id', id).select().single();
+    },
+    async getContactVendors(contactId) {
+      if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
+      return window.supabaseClient.from('vendor_contacts').select('id, role, is_primary, vendors(name)').eq('contact_id', contactId).eq('is_active', true).order('created_at', { ascending: false });
+    },
     async createOpnameOrder(payload) {
       if (!this.ready) return { data: null, error: new Error('Supabase belum dikonfigurasi') };
       return window.supabaseClient.from('stock_opname_orders').insert(payload).select().single();
