@@ -239,6 +239,10 @@ create table public.spare_parts (
   last_purchase_date date,
   item_type public.item_type not null default 'stock',
   photo_url text,
+  default_discount_pct numeric(5, 2) not null default 0 check (default_discount_pct >= 0 and default_discount_pct <= 100),
+  min_sell_qty numeric(12, 2) not null default 1 check (min_sell_qty >= 0),
+  ppn_rate numeric(5, 2) not null default 0 check (ppn_rate >= 0 and ppn_rate <= 100),
+  ref_tax_code text,
   is_active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -348,6 +352,25 @@ create table public.stock_opname_items (
   created_at timestamptz not null default now()
 );
 
+create table public.item_price_tiers (
+  id uuid primary key default gen_random_uuid(),
+  spare_part_id uuid not null references public.spare_parts(id) on delete cascade,
+  min_qty numeric(12, 2) not null check (min_qty > 0),
+  price numeric(14, 2) not null check (price >= 0),
+  created_at timestamptz not null default now(),
+  unique (spare_part_id, min_qty)
+);
+
+create table public.item_substitutes (
+  id uuid primary key default gen_random_uuid(),
+  spare_part_id uuid not null references public.spare_parts(id) on delete cascade,
+  substitute_id uuid not null references public.spare_parts(id) on delete restrict,
+  notes text,
+  created_at timestamptz not null default now(),
+  unique (spare_part_id, substitute_id),
+  check (spare_part_id <> substitute_id)
+);
+
 create table public.maintenance_parts (
   id uuid primary key default gen_random_uuid(),
   maintenance_record_id uuid not null references public.maintenance_records(id) on delete cascade,
@@ -443,7 +466,7 @@ begin
     'asset_ownership_history', 'maintenance_schedules', 'work_orders',
     'maintenance_records', 'spare_parts', 'spare_part_vendor_prices', 'item_categories', 'item_brands',
     'units', 'item_units', 'spare_part_bundle_items', 'warehouses', 'vendors', 'stock_opname_orders',
-    'stock_opname_items', 'maintenance_parts', 'audit_logs'
+    'stock_opname_items', 'item_price_tiers', 'item_substitutes', 'maintenance_parts', 'audit_logs'
   ] loop
     execute format('alter table public.%I enable row level security', table_name);
     execute format('drop policy if exists authenticated_full_access on public.%I', table_name);

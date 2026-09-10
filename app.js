@@ -957,7 +957,7 @@ const printQuotation = (quote) => {
   const items = quote.quotation_items || [];
   const printWindow = window.open('', '_blank', 'width=900,height=700');
   if (!printWindow) return;
-  printWindow.document.write(`<title>${quote.quotation_code}</title><style>body{font:14px Arial;color:#182235;max-width:800px;margin:40px auto}h1{margin-bottom:4px}table{width:100%;border-collapse:collapse;margin-top:28px}th,td{padding:10px;border-bottom:1px solid #ddd;text-align:left}td:last-child,th:last-child{text-align:right}.total{text-align:right;font-size:18px;font-weight:bold;margin-top:20px}</style><h1>Penawaran ${quote.quotation_code}</h1><p>Customer: <b>${quote.customers?.name || '-'}</b><br>Berlaku sampai: ${quote.valid_until || '-'}</p><table><thead><tr><th>Deskripsi</th><th>Jumlah</th><th>Harga</th><th>Total</th></tr></thead><tbody>${items.map((item) => `<tr><td>${item.description}</td><td>${item.quantity} ${item.unit}</td><td>${formatRupiah(item.unit_price)}</td><td>${formatRupiah(item.line_total)}</td></tr>`).join('')}</tbody></table><p class="total">Total: ${formatRupiah(quote.total)}</p>`);
+  printWindow.document.write(`<title>${quote.quotation_code}</title><style>body{font:14px Arial;color:#182235;max-width:800px;margin:40px auto}h1{margin-bottom:4px}table{width:100%;border-collapse:collapse;margin-top:28px}th,td{padding:10px;border-bottom:1px solid #ddd;text-align:left}td:last-child,th:last-child{text-align:right}.total{text-align:right;font-size:18px;font-weight:bold;margin-top:20px}.subtotal{text-align:right;color:#555;margin-top:20px}</style><h1>Penawaran ${quote.quotation_code}</h1><p>Customer: <b>${quote.customers?.name || '-'}</b><br>Berlaku sampai: ${quote.valid_until || '-'}</p><table><thead><tr><th>Deskripsi</th><th>Jumlah</th><th>Harga</th><th>Diskon</th><th>Total</th></tr></thead><tbody>${items.map((item) => `<tr><td>${item.description}</td><td>${item.quantity} ${item.unit}</td><td>${formatRupiah(item.unit_price)}</td><td>${formatRupiah(item.discount)}</td><td>${formatRupiah(item.line_total)}</td></tr>`).join('')}</tbody></table><p class="subtotal">Subtotal: ${formatRupiah(quote.subtotal)}${Number(quote.tax) > 0 ? `<br>PPN: ${formatRupiah(quote.tax)}` : ''}</p><p class="total">Total: ${formatRupiah(quote.total)}</p>`);
   printWindow.document.close(); printWindow.focus(); printWindow.print();
 };
 async function loadDatabaseData() {
@@ -1167,7 +1167,7 @@ $('#reportForm').addEventListener('submit', async (event) => {
 
 const partModal = document.createElement('div');
 partModal.className = 'modal-backdrop';
-partModal.innerHTML = '<div class="modal inventory-modal"><div class="modal-header"><div><p class="eyebrow">MASTER SPARE PART</p><h2>Tambah spare part</h2></div><button class="icon-button" id="closePartModal"><svg><use href="#i-close"/></svg></button></div><form id="partForm"><div class="part-form-grid"><label>Part number<input required name="partCode" placeholder="Contoh: FLT-OLI-125" /></label><label>Nama part<input required name="name" placeholder="Nama spare part" /></label><label>Tipe barang<select required name="itemType"><option value="stock">Persediaan (stok dihitung)</option><option value="non_stock">Non Persediaan (habis pakai)</option><option value="service">Jasa</option><option value="group">Grup / Paket</option></select></label><label>Kategori<input name="category" list="categoryDatalist" placeholder="Filter / Electrical" /></label><label>Brand<input name="brand" list="brandDatalist" placeholder="Contoh: Fleetguard" /></label><label>Satuan dasar<input required name="unit" list="unitDatalist" placeholder="pcs" value="pcs" /></label><label>Minimum stok<input required type="number" min="0" name="minimumStock" value="0" /></label><label>Harga pricelist (Rp)<input type="number" min="0" name="listPrice" placeholder="Harga jual" /></label><label>Berat (kg)<input type="number" min="0" step="0.001" name="weight" placeholder="Contoh: 2.5" /></label><label>Panjang (cm)<input type="number" min="0" step="0.1" name="length" placeholder="Contoh: 30" /></label><label>Lebar (cm)<input type="number" min="0" step="0.1" name="width" placeholder="Contoh: 20" /></label><label>Tinggi (cm)<input type="number" min="0" step="0.1" name="height" placeholder="Contoh: 15" /></label><label>Harga beli terakhir (Rp)<input type="number" min="0" name="lastPurchasePrice" placeholder="Harga beli terakhir" /></label><label>Tanggal beli terakhir<input type="date" name="lastPurchaseDate" /></label><label>Foto produk<input type="file" name="photo" accept="image/png,image/jpeg,image/webp" /></label><label>Gudang stok awal<select name="openingWarehouse" id="partOpeningWarehouse"><option value="">-- Tanpa stok awal --</option></select></label><label>Qty stok awal<input type="number" min="0" step="0.01" name="openingQty" placeholder="0" /></label><label>Biaya satuan awal (Rp)<input type="number" min="0" name="openingCost" placeholder="Harga modal" /></label><label class="part-full">Spesifikasi<input name="specification" placeholder="Detail ukuran atau spesifikasi teknis" /></label><label class="part-full">Compatible model<input name="compatibleModels" placeholder="Contoh: RG 125 / 150 kVA" /></label><div class="part-full"><div class="detail-section-heading"><h3>Satuan konversi</h3><button type="button" class="text-button" id="addUnitRowButton">+ Tambah satuan</button></div><div id="unitConversionRows"></div><datalist id="categoryDatalist"></datalist><datalist id="brandDatalist"></datalist><datalist id="unitDatalist"></datalist></div></div><div class="modal-actions"><button type="button" class="secondary-button" id="cancelPartModal">Batal</button><button class="primary-button" type="submit">Simpan spare part</button></div></form></div>';
+partModal.innerHTML = '<div class="modal inventory-modal"><div class="modal-header"><div><p class="eyebrow">MASTER SPARE PART</p><h2>Tambah spare part</h2></div><button class="icon-button" id="closePartModal"><svg><use href="#i-close"/></svg></button></div><form id="partForm"><div class="part-form-grid"><label>Part number<input required name="partCode" placeholder="Contoh: FLT-OLI-125" /></label><label>Nama part<input required name="name" placeholder="Nama spare part" /></label><label>Tipe barang<select required name="itemType"><option value="stock">Persediaan (stok dihitung)</option><option value="non_stock">Non Persediaan (habis pakai)</option><option value="service">Jasa</option><option value="group">Grup / Paket</option></select></label><label>Kategori<input name="category" list="categoryDatalist" placeholder="Filter / Electrical" /></label><label>Brand<input name="brand" list="brandDatalist" placeholder="Contoh: Fleetguard" /></label><label>Satuan dasar<input required name="unit" list="unitDatalist" placeholder="pcs" value="pcs" /></label><label>Minimum stok<input required type="number" min="0" name="minimumStock" value="0" /></label><label>Harga pricelist (Rp)<input type="number" min="0" name="listPrice" placeholder="Harga jual" /></label><label>Diskon default (%)<input type="number" min="0" max="100" step="0.01" name="discountPct" placeholder="0" /></label><label>Minimum jual<input type="number" min="0" step="0.01" name="minSell" placeholder="1" /></label><label>PPN (%)<input type="number" min="0" max="100" step="0.01" name="ppnRate" placeholder="Contoh: 11" /></label><label>Ref. kode pajak<input name="refTax" placeholder="Kode referensi DJP" /></label><label>Berat (kg)<input type="number" min="0" step="0.001" name="weight" placeholder="Contoh: 2.5" /></label><label>Panjang (cm)<input type="number" min="0" step="0.1" name="length" placeholder="Contoh: 30" /></label><label>Lebar (cm)<input type="number" min="0" step="0.1" name="width" placeholder="Contoh: 20" /></label><label>Tinggi (cm)<input type="number" min="0" step="0.1" name="height" placeholder="Contoh: 15" /></label><label>Harga beli terakhir (Rp)<input type="number" min="0" name="lastPurchasePrice" placeholder="Harga beli terakhir" /></label><label>Tanggal beli terakhir<input type="date" name="lastPurchaseDate" /></label><label>Foto produk<input type="file" name="photo" accept="image/png,image/jpeg,image/webp" /></label><label>Gudang stok awal<select name="openingWarehouse" id="partOpeningWarehouse"><option value="">-- Tanpa stok awal --</option></select></label><label>Qty stok awal<input type="number" min="0" step="0.01" name="openingQty" placeholder="0" /></label><label>Biaya satuan awal (Rp)<input type="number" min="0" name="openingCost" placeholder="Harga modal" /></label><label class="part-full">Spesifikasi<input name="specification" placeholder="Detail ukuran atau spesifikasi teknis" /></label><label class="part-full">Compatible model<input name="compatibleModels" placeholder="Contoh: RG 125 / 150 kVA" /></label><div class="part-full"><div class="detail-section-heading"><h3>Satuan konversi</h3><button type="button" class="text-button" id="addUnitRowButton">+ Tambah satuan</button></div><div id="unitConversionRows"></div><datalist id="categoryDatalist"></datalist><datalist id="brandDatalist"></datalist><datalist id="unitDatalist"></datalist></div></div><div class="modal-actions"><button type="button" class="secondary-button" id="cancelPartModal">Batal</button><button class="primary-button" type="submit">Simpan spare part</button></div></form></div>';
 document.body.append(partModal);
 const closePartModal = () => partModal.classList.remove('open');
 async function refreshPartMasters() {
@@ -1209,7 +1209,7 @@ $('#partForm').addEventListener('submit', async (event) => {
     if (categoryName) await window.crmDb.createCategory({ name: categoryName });
     if (brandName) await window.crmDb.createBrand({ name: brandName });
     await window.crmDb.createUnit({ code: baseUnit, name: baseUnit });
-    const result = await window.crmDb.createSparePart({ part_code: form.get('partCode'), name: form.get('name'), item_type: form.get('itemType') || 'stock', brand: brandName, category: categoryName, unit: baseUnit, minimum_stock: Number(form.get('minimumStock')), weight_kg: Number(form.get('weight')) || null, length_cm: Number(form.get('length')) || null, width_cm: Number(form.get('width')) || null, height_cm: Number(form.get('height')) || null, list_price: Number(form.get('listPrice')) || 0, last_purchase_price: Number(form.get('lastPurchasePrice')) || null, last_purchase_date: form.get('lastPurchaseDate') || null, specification: form.get('specification') || null, compatible_models: form.get('compatibleModels') || null });
+    const result = await window.crmDb.createSparePart({ part_code: form.get('partCode'), name: form.get('name'), item_type: form.get('itemType') || 'stock', brand: brandName, category: categoryName, unit: baseUnit, minimum_stock: Number(form.get('minimumStock')), weight_kg: Number(form.get('weight')) || null, length_cm: Number(form.get('length')) || null, width_cm: Number(form.get('width')) || null, height_cm: Number(form.get('height')) || null, list_price: Number(form.get('listPrice')) || 0, default_discount_pct: Number(form.get('discountPct')) || 0, min_sell_qty: Number(form.get('minSell')) || 1, ppn_rate: Number(form.get('ppnRate')) || 0, ref_tax_code: form.get('refTax') || null, last_purchase_price: Number(form.get('lastPurchasePrice')) || null, last_purchase_date: form.get('lastPurchaseDate') || null, specification: form.get('specification') || null, compatible_models: form.get('compatibleModels') || null });
     if (result.error) { window.alert(`Spare part belum tersimpan: ${result.error.message}`); return; }
     newPartId = result.data?.id;
     if (newPartId) {
@@ -1236,7 +1236,7 @@ $('#partForm').addEventListener('submit', async (event) => {
         const opening = await window.crmDb.createInventoryMovement({ spare_part_id: newPartId, warehouse_id: form.get('openingWarehouse'), movement_type: 'inbound', quantity: openingQty, unit_cost: Number(form.get('openingCost')) || 0, reference_type: 'opening_balance', notes: 'Stok awal' });
         if (opening.error) showToast(`Part tersimpan, tetapi stok awal gagal: ${opening.error.message}`, true);
       }
-      partCache.unshift({ spare_part_id: newPartId, part_code: result.data.part_code, name: result.data.name, unit: result.data.unit, list_price: result.data.list_price, weight_kg: result.data.weight_kg, length_cm: result.data.length_cm, width_cm: result.data.width_cm, height_cm: result.data.height_cm, last_purchase_price: result.data.last_purchase_price, photo_url: photoUrl, item_type: result.data.item_type });
+      partCache.unshift({ spare_part_id: newPartId, part_code: result.data.part_code, name: result.data.name, unit: result.data.unit, stock_on_hand: 0, list_price: result.data.list_price, weight_kg: result.data.weight_kg, length_cm: result.data.length_cm, width_cm: result.data.width_cm, height_cm: result.data.height_cm, last_purchase_price: result.data.last_purchase_price, photo_url: photoUrl, item_type: result.data.item_type, ppn_rate: result.data.ppn_rate, min_sell_qty: result.data.min_sell_qty, default_discount_pct: result.data.default_discount_pct });
     }
   }
   const row = document.createElement('tr');
@@ -1262,7 +1262,7 @@ function bindPartRowButtons() {
 let activeVendorPartId = null;
 const vendorModal = document.createElement('div');
 vendorModal.className = 'modal-backdrop';
-vendorModal.innerHTML = '<div class="modal relation-modal"><div class="modal-header"><div><p class="eyebrow">HARGA VENDOR</p><h2 id="vendorTitle">Penawaran vendor</h2></div><button class="icon-button" id="closeVendorModal"><svg><use href="#i-close"/></svg></button></div><div class="company-logo" id="vendorPartDetail"></div><div class="customer-contact-list" id="vendorPriceList"></div><form id="vendorPriceForm"><datalist id="vendorDatalist"></datalist><div class="quotation-form-grid"><label>Nama vendor<input required name="vendor" list="vendorDatalist" placeholder="Nama vendor" /></label><label>Harga penawaran (Rp)<input required type="number" min="0" name="price" placeholder="Rp" /></label><label>Berlaku sampai<input type="date" name="validUntil" /></label></div><label>Catatan<input name="notes" placeholder="Syarat atau catatan vendor" /></label><div class="modal-actions"><button type="button" class="secondary-button" id="cancelVendorModal">Batal</button><button class="primary-button" type="submit">Simpan penawaran</button></div></form></div>';
+vendorModal.innerHTML = '<div class="modal relation-modal"><div class="modal-header"><div><p class="eyebrow">HARGA VENDOR</p><h2 id="vendorTitle">Penawaran vendor</h2></div><button class="icon-button" id="closeVendorModal"><svg><use href="#i-close"/></svg></button></div><div class="company-logo" id="vendorPartDetail"></div><div class="customer-contact-list" id="vendorPriceList"></div><form id="vendorPriceForm"><datalist id="vendorDatalist"></datalist><div class="quotation-form-grid"><label>Nama vendor<input required name="vendor" list="vendorDatalist" placeholder="Nama vendor" /></label><label>Harga penawaran (Rp)<input required type="number" min="0" name="price" placeholder="Rp" /></label><label>Berlaku sampai<input type="date" name="validUntil" /></label></div><label>Catatan<input name="notes" placeholder="Syarat atau catatan vendor" /></label><div class="modal-actions"><button type="button" class="secondary-button" id="cancelVendorModal">Batal</button><button class="primary-button" type="submit">Simpan penawaran</button></div></form><div class="detail-section-heading"><h3>Harga grosir bertingkat</h3></div><div class="customer-contact-list" id="tierList"></div><div class="master-add"><input id="newTierQty" type="number" min="0.01" step="any" placeholder="Min. qty" /><input id="newTierPrice" type="number" min="0" placeholder="Harga Rp" /><button class="secondary-button" id="addTierButton" type="button">Tambah</button></div><div class="detail-section-heading"><h3>Barang substitusi</h3></div><div class="customer-contact-list" id="substituteList"></div><div class="master-add"><select id="newSubstituteSelect"></select><button class="secondary-button" id="addSubstituteButton" type="button">Tambah</button></div></div>';
 document.body.append(vendorModal);
 applyTwoColumn(vendorModal, 680);
 const closeVendorModal = () => vendorModal.classList.remove('open');
@@ -1279,6 +1279,14 @@ async function refreshVendorPrices() {
   $('#vendorPartDetail').innerHTML = part
     ? `<span${part.photo_url ? ` style="background-image:url('${part.photo_url}');background-size:cover;color:transparent"` : ''}>${(part.name || '?').slice(0, 1).toUpperCase()}</span><div><b>${part.name}</b><small>${part.brand || ''} ${part.category || ''} · ${typeLabels[part.item_type] || ''}</small><small>${part.weight_kg ? `${part.weight_kg} kg` : ''}${dims ? ` · ${dims}` : ''}</small><small>Pricelist: ${part.list_price ? formatRupiah(part.list_price) : '-'} · Beli terakhir: ${part.last_purchase_price ? formatRupiah(part.last_purchase_price) : '-'}</small>${units.filter((u) => Number(u.conversion_to_base) !== 1).length ? `<small>Satuan: ${units.filter((u) => Number(u.conversion_to_base) !== 1).map((u) => `1 ${u.unit} = ${u.conversion_to_base} ${part.unit}`).join(' · ')}</small>` : ''}</div>`
     : '';
+  const [tiersResult, substitutesResult] = await Promise.all([window.crmDb.getPriceTiers(activeVendorPartId), window.crmDb.getSubstitutes(activeVendorPartId)]);
+  $('#tierList').innerHTML = tiersResult.data?.length
+    ? tiersResult.data.map((tier) => `<div class="detail-pic"><div><b>Min. ${tier.min_qty}</b><small>${formatRupiah(tier.price)}</small></div>${isAdmin() ? `<button class="icon-button tier-delete" data-id="${tier.id}" title="Hapus">✕</button>` : ''}</div>`).join('')
+    : '<div class="detail-pic"><div><b>Belum ada tier</b><small>Harga pricelist berlaku</small></div></div>';
+  $('#substituteList').innerHTML = substitutesResult.data?.length
+    ? substitutesResult.data.map((row) => `<div class="detail-pic"><div><b>${row.substitute?.part_code || ''} · ${row.substitute?.name || '-'}</b><small>${row.substitute?.list_price ? formatRupiah(row.substitute.list_price) : ''}</small></div>${isAdmin() ? `<button class="icon-button substitute-delete" data-id="${row.id}" title="Hapus">✕</button>` : ''}</div>`).join('')
+    : '<div class="detail-pic"><div><b>Belum ada substitusi</b></div></div>';
+  $('#newSubstituteSelect').innerHTML = partCache.filter((part) => String(part.spare_part_id) !== String(activeVendorPartId)).map((part) => `<option value="${part.spare_part_id}">${part.part_code} · ${part.name}</option>`).join('');
   const result = await window.crmDb.getVendorPrices(activeVendorPartId);
   if (result.error) { $('#vendorPriceList').innerHTML = `<div class="detail-pic"><div><b>Gagal memuat</b><small>${result.error.message}</small></div></div>`; return; }
   $('#vendorPriceList').innerHTML = result.data?.length
@@ -1298,6 +1306,44 @@ $('#vendorPriceList').addEventListener('click', async (event) => {
   const result = await window.crmDb.updateSparePart(activeVendorPartId, { last_purchase_price: Number(button.dataset.price), last_purchase_date: new Date().toISOString().slice(0, 10) });
   if (result.error) { showToast(`Gagal memperbarui harga beli: ${result.error.message}`, true); return; }
   showToast('Harga beli terakhir diperbarui.');
+});
+vendorModal.addEventListener('click', async (event) => {
+  const tierButton = event.target.closest('.tier-delete');
+  if (tierButton) {
+    if (!isAdmin()) { showToast('Hanya administrator yang dapat menghapus tier.', true); return; }
+    const result = await window.crmDb.deleteTier(tierButton.dataset.id);
+    if (result.error) { showToast(`Gagal menghapus: ${result.error.message}`, true); return; }
+    showToast('Tier dihapus.');
+    await refreshVendorPrices();
+    return;
+  }
+  const substituteButton = event.target.closest('.substitute-delete');
+  if (substituteButton) {
+    if (!isAdmin()) { showToast('Hanya administrator yang dapat menghapus substitusi.', true); return; }
+    const result = await window.crmDb.deleteSubstitute(substituteButton.dataset.id);
+    if (result.error) { showToast(`Gagal menghapus: ${result.error.message}`, true); return; }
+    showToast('Substitusi dihapus.');
+    await refreshVendorPrices();
+  }
+});
+$('#addTierButton').addEventListener('click', async () => {
+  const qty = Number($('#newTierQty').value);
+  const price = Number($('#newTierPrice').value);
+  if (!(qty > 0) || !(price >= 0)) { showToast('Isi min. qty dan harga dengan benar.', true); return; }
+  const result = await window.crmDb.createPriceTier({ spare_part_id: activeVendorPartId, min_qty: qty, price });
+  if (result.error) { showToast(`Tier belum tersimpan: ${result.error.message}`, true); return; }
+  $('#newTierQty').value = '';
+  $('#newTierPrice').value = '';
+  showToast('Tier harga tersimpan.');
+  await refreshVendorPrices();
+});
+$('#addSubstituteButton').addEventListener('click', async () => {
+  const substituteId = $('#newSubstituteSelect').value;
+  if (!substituteId) return;
+  const result = await window.crmDb.createSubstitute({ spare_part_id: activeVendorPartId, substitute_id: substituteId });
+  if (result.error) { showToast(`Substitusi belum tersimpan: ${result.error.message}`, true); return; }
+  showToast('Substitusi tersimpan.');
+  await refreshVendorPrices();
 });
 $('#vendorPriceForm').addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -1321,7 +1367,7 @@ $('#vendorPriceForm').addEventListener('submit', async (event) => {
 bindPartRowButtons();
 const masterModal = document.createElement('div');
 masterModal.className = 'modal-backdrop';
-masterModal.innerHTML = '<div class="modal relation-modal"><div class="modal-header"><div><p class="eyebrow">MASTER DATA</p><h2>Master persediaan</h2></div><button class="icon-button" id="closeMasterModal"><svg><use href="#i-close"/></svg></button></div><div class="detail-section-heading"><h3>Kategori barang</h3></div><div class="customer-contact-list" id="masterCategoryList"></div><div class="master-add"><input id="newCategoryName" placeholder="Kategori baru" /><button class="secondary-button" id="addCategoryButton" type="button">Tambah</button></div><div class="detail-section-heading"><h3>Merk barang</h3></div><div class="customer-contact-list" id="masterBrandList"></div><div class="master-add"><input id="newBrandName" placeholder="Merk baru" /><button class="secondary-button" id="addBrandButton" type="button">Tambah</button></div><div class="detail-section-heading"><h3>Satuan barang</h3></div><div class="customer-contact-list" id="masterUnitList"></div><div class="master-add"><input id="newUnitCode" placeholder="Satuan baru (pcs)" /><button class="secondary-button" id="addUnitButton" type="button">Tambah</button></div><div class="modal-actions"><button class="primary-button" id="closeMasterButton" type="button">Tutup</button></div></div>';
+masterModal.innerHTML = '<div class="modal relation-modal"><div class="modal-header"><div><p class="eyebrow">MASTER DATA</p><h2>Master persediaan</h2></div><button class="icon-button" id="closeMasterModal"><svg><use href="#i-close"/></svg></button></div><div class="detail-section-heading"><h3>Kategori barang</h3></div><div class="customer-contact-list" id="masterCategoryList"></div><div class="master-add"><input id="newCategoryName" placeholder="Kategori baru" /><button class="secondary-button" id="addCategoryButton" type="button">Tambah</button></div><div class="detail-section-heading"><h3>Merk barang</h3></div><div class="customer-contact-list" id="masterBrandList"></div><div class="master-add"><input id="newBrandName" placeholder="Merk baru" /><button class="secondary-button" id="addBrandButton" type="button">Tambah</button></div><div class="detail-section-heading"><h3>Satuan barang</h3></div><div class="customer-contact-list" id="masterUnitList"></div><div class="master-add"><input id="newUnitCode" placeholder="Satuan baru (pcs)" /><button class="secondary-button" id="addUnitButton" type="button">Tambah</button></div><div class="detail-section-heading"><h3>Gudang</h3></div><div class="customer-contact-list" id="masterWarehouseList"></div><div class="master-add"><input id="newWarehouseName" placeholder="Nama gudang baru" /><input id="newWarehouseAddress" placeholder="Alamat (opsional)" /><button class="secondary-button" id="addWarehouseButton" type="button">Tambah</button></div><div class="modal-actions"><button class="primary-button" id="closeMasterButton" type="button">Tutup</button></div></div>';
 document.body.append(masterModal);
 applyTwoColumn(masterModal, 680);
 const closeMasterModal = () => masterModal.classList.remove('open');
@@ -1329,13 +1375,27 @@ $('#closeMasterModal').addEventListener('click', closeMasterModal);
 $('#closeMasterButton').addEventListener('click', closeMasterModal);
 masterModal.addEventListener('click', (event) => { if (event.target === masterModal) closeMasterModal(); });
 async function refreshMasters() {
-  const [cats, brands, units] = await Promise.all([window.crmDb.getCategories(), window.crmDb.getBrands(), window.crmDb.getUnits()]);
+  const [cats, brands, units, warehouses] = await Promise.all([window.crmDb.getCategories(), window.crmDb.getBrands(), window.crmDb.getUnits(), window.crmDb.getWarehouses()]);
   const paint = (el, items, label) => { $(el).innerHTML = items?.length ? items.map((item) => `<div class="detail-pic"><div><b>${item.name || item.code}</b></div>${isAdmin() ? `<button class="icon-button master-delete" data-kind="${label}" data-id="${item.id}" data-name="${item.name || item.code}" title="Hapus">✕</button>` : ''}</div>`).join('') : `<div class="detail-pic"><div><b>Belum ada data</b></div></div>`; };
   if (!cats.error) paint('#masterCategoryList', cats.data, 'category');
   if (!brands.error) paint('#masterBrandList', brands.data, 'brand');
   if (!units.error) paint('#masterUnitList', units.data, 'unit');
+  if (!warehouses.error) {
+    $('#masterWarehouseList').innerHTML = warehouses.data?.length
+      ? warehouses.data.map((warehouse) => `<div class="detail-pic"><div><b>${warehouse.name}</b><small>${warehouse.is_active ? 'Aktif' : 'Nonaktif'}</small></div>${isAdmin() ? `<button class="text-button master-toggle" data-id="${warehouse.id}" data-active="${warehouse.is_active}" title="Aktif/nonaktif">${warehouse.is_active ? 'Nonaktifkan' : 'Aktifkan'}</button>` : ''}</div>`).join('')
+      : '<div class="detail-pic"><div><b>Belum ada data</b></div></div>';
+  }
 }
 masterModal.addEventListener('click', async (event) => {
+  const toggle = event.target.closest('.master-toggle');
+  if (toggle) {
+    if (!isAdmin()) { showToast('Hanya administrator yang dapat mengubah gudang.', true); return; }
+    const result = await window.crmDb.updateWarehouse(toggle.dataset.id, { is_active: toggle.dataset.active !== 'true' });
+    if (result.error) { showToast(`Gagal memperbarui: ${result.error.message}`, true); return; }
+    showToast('Gudang diperbarui.');
+    await refreshMasters();
+    return;
+  }
   const button = event.target.closest('.master-delete');
   if (!button) return;
   if (!isAdmin()) { showToast('Hanya administrator yang dapat menghapus master.', true); return; }
@@ -1346,6 +1406,16 @@ masterModal.addEventListener('click', async (event) => {
   showToast('Master dihapus.');
   await refreshMasters();
   await refreshPartMasters();
+});
+$('#addWarehouseButton').addEventListener('click', async () => {
+  const name = $('#newWarehouseName').value.trim();
+  if (!name) return;
+  const result = await window.crmDb.createWarehouse({ code: `WH-${Date.now().toString(36).toUpperCase()}`, name, address: $('#newWarehouseAddress').value.trim() || null });
+  if (result.error) { showToast(`Gagal menyimpan: ${result.error.message}`, true); return; }
+  $('#newWarehouseName').value = '';
+  $('#newWarehouseAddress').value = '';
+  showToast('Gudang tersimpan.');
+  await refreshMasters();
 });
 const addMasterEntry = async (inputId, creator) => {
   const name = $(inputId).value.trim();
@@ -1383,14 +1453,27 @@ $('#createQuotationButton').addEventListener('click', () => {
   $('#quotationForm').dataset.sparePartId = '';
   quotationModal.classList.add('open');
 });
-$('#quotationPartSelect').addEventListener('change', (event) => {
+let quotationTiers = [];
+let quotationPart = null;
+const applyTierPrice = () => {
+  if (!quotationPart) return;
+  const qty = Number($('#quotationForm input[name="quantity"]').value) || 0;
+  const tier = quotationTiers.filter((row) => Number(row.min_qty) <= qty).sort((a, b) => Number(b.min_qty) - Number(a.min_qty))[0];
+  $('#quotationForm input[name="unitPrice"]').value = tier ? tier.price : (quotationPart.list_price || 0);
+};
+$('#quotationPartSelect').addEventListener('change', async (event) => {
   const part = partCache.find((item) => String(item.spare_part_id) === event.target.value);
+  quotationPart = part || null;
+  quotationTiers = [];
   $('#quotationForm').dataset.sparePartId = part ? part.spare_part_id : '';
   if (part) {
     $('#quotationForm input[name="description"]').value = `${part.part_code} · ${part.name}`;
-    if (part.list_price) $('#quotationForm input[name="unitPrice"]').value = part.list_price;
+    const tiers = await window.crmDb.getPriceTiers(part.spare_part_id);
+    if (!tiers.error) quotationTiers = tiers.data || [];
+    applyTierPrice();
   }
 });
+$('#quotationForm input[name="quantity"]').addEventListener('input', applyTierPrice);
 $('#closeQuotationModal').addEventListener('click', closeQuotationModal);
 $('#cancelQuotationModal').addEventListener('click', closeQuotationModal);
 quotationModal.addEventListener('click', (event) => { if (event.target === quotationModal) closeQuotationModal(); });
@@ -1399,10 +1482,26 @@ $('#quotationForm').addEventListener('submit', async (event) => {
   const form = new FormData(event.target);
   if (window.crmDb?.ready && String(form.get('customer')).startsWith('demo-')) { window.alert('Customer demo belum memiliki ID database.'); return; }
   if (window.crmDb?.ready) {
+    const quantity = Number(form.get('quantity'));
+    const unitPrice = Number(form.get('unitPrice'));
+    if (quotationPart) {
+      if (quantity < Number(quotationPart.min_sell_qty || 1) && !window.confirm(`Jumlah di bawah minimum jual (${quotationPart.min_sell_qty || 1}). Tetap lanjut?`)) return;
+      if (quantity > Number(quotationPart.stock_on_hand || 0)) {
+        const substitutes = await window.crmDb.getSubstitutes(quotationPart.spare_part_id);
+        const names = substitutes.data?.map((row) => row.substitute ? `${row.substitute.part_code} · ${row.substitute.name}` : '').filter(Boolean).join(', ');
+        if (!window.confirm(`Stok tidak mencukupi (tersedia ${quotationPart.stock_on_hand || 0}).${names ? ` Substitusi: ${names}.` : ''} Tetap lanjut?`)) return;
+      }
+    }
+    const discountRate = Number(quotationPart?.default_discount_pct || 0);
+    const lineDiscount = quantity * unitPrice * discountRate / 100;
+    const ppnAmount = quantity * unitPrice * Number(quotationPart?.ppn_rate || 0) / 100;
     const quote = await window.crmDb.createQuotation({ customer_id: form.get('customer'), status: 'draft', valid_until: form.get('validUntil') || null });
     if (quote.error) { window.alert(`Penawaran belum tersimpan: ${quote.error.message}`); return; }
-    const item = await window.crmDb.createQuotationItem({ quotation_id: quote.data.id, spare_part_id: event.target.dataset.sparePartId || null, description: form.get('description'), quantity: Number(form.get('quantity')), unit_price: Number(form.get('unitPrice')) });
+    if (ppnAmount > 0) await window.crmDb.updateQuotation(quote.data.id, { tax: ppnAmount });
+    const item = await window.crmDb.createQuotationItem({ quotation_id: quote.data.id, spare_part_id: event.target.dataset.sparePartId || null, description: form.get('description'), quantity, unit_price: unitPrice, discount: lineDiscount });
     if (item.error) { window.alert(`Penawaran dibuat, tetapi item belum tersimpan: ${item.error.message}`); return; }
+    quotationPart = null;
+    quotationTiers = [];
   }
   event.target.reset();
     closeQuotationModal();

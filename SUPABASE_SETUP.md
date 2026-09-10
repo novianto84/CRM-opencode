@@ -23,6 +23,8 @@ Profil customer dan logo tersedia di `supabase/migrations/004_customer_profile.s
 13. Jalankan query `supabase/migrations/009_spare_part_pricing.sql` untuk pricelist, dimensi/berat, harga beli terakhir, dan histori harga vendor.
 14. Jalankan query `supabase/migrations/010_item_masters.sql` untuk tipe barang, kategori, merk, satuan bertingkat, foto produk, dan komposisi paket.
 15. Jalankan query `supabase/migrations/011_vendors_opname.sql` untuk master pemasok dan dokumen stok opname.
+16. Jalankan query `supabase/migrations/012_pricing_tax_substitutes.sql` untuk harga grosir bertingkat, PPN per barang, dan substitusi.
+17. Jalankan query `supabase/migrations/013_view_pricing_columns.sql` untuk kolom harga dan pajak di view inventory.
 
 ## Struktur Utama
 
