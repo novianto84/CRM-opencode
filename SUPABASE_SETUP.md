@@ -31,6 +31,7 @@ Profil customer dan logo tersedia di `supabase/migrations/004_customer_profile.s
 21. Jalankan query `supabase/migrations/017_item_requests.sql` untuk permintaan barang.
 22. Jalankan query `supabase/migrations/018_manufacturing_pricing.sql` untuk produksi dan penyesuaian harga global.
 23. Jalankan query `supabase/migrations/019_vendor_contacts.sql` untuk daftar PIC vendor dari direktori contact.
+24. Jalankan query `supabase/migrations/020_party_links.sql` untuk relasi terpadu customer-pemasok (satu pihak bisa keduanya).
 
 ## Struktur Utama
 

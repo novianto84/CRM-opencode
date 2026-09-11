@@ -546,6 +546,14 @@ create table public.serial_numbers (
   unique (spare_part_id, serial_code)
 );
 
+create table public.party_links (
+  id uuid primary key default gen_random_uuid(),
+  customer_id uuid not null unique references public.customers(id) on delete cascade,
+  vendor_id uuid not null unique references public.vendors(id) on delete cascade,
+  notes text,
+  created_at timestamptz not null default now()
+);
+
 create type public.item_request_status as enum ('draft', 'approved', 'partial', 'fulfilled', 'cancelled');
 
 create table public.item_requests (
@@ -751,7 +759,7 @@ begin
     'units', 'item_units', 'spare_part_bundle_items', 'warehouses', 'vendors', 'stock_opname_orders',
     'stock_opname_items', 'item_price_tiers', 'item_substitutes', 'purchase_orders', 'purchase_order_items',
     'goods_receipts', 'goods_receipt_items', 'sales_orders', 'sales_order_items', 'delivery_orders',
-    'delivery_items', 'sales_invoices', 'invoice_payments', 'serial_numbers', 'vendor_contacts', 'item_requests', 'item_request_items',
+    'delivery_items', 'sales_invoices', 'invoice_payments', 'serial_numbers', 'vendor_contacts', 'party_links', 'item_requests', 'item_request_items',
     'manufacture_orders', 'manufacture_materials', 'price_adjustments', 'maintenance_parts', 'audit_logs'
   ] loop
     execute format('alter table public.%I enable row level security', table_name);

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles-44.css" />
+    <link rel="stylesheet" href="styles-45.css" />
 </head>
 <body>
   <svg class="svg-sprite" aria-hidden="true">
@@ -39,6 +39,7 @@
         <button class="nav-item" data-module="Kontak"><svg><use href="#i-users"/></svg><span>Kontak</span><em>248</em></button>
         <button class="nav-item" data-module="Inventory"><svg><use href="#i-box"/></svg><span>Inventory</span><em class="badge-warn">12</em></button>
         <button class="nav-item" data-module="Pemasok"><svg><use href="#i-briefcase"/></svg><span>Pemasok</span><em id="vendorNavCount"></em></button>
+        <button class="nav-item" data-module="Relasi"><svg><use href="#i-users"/></svg><span>Relasi Bisnis</span></button>
         <button class="nav-item" data-module="Maintenance"><svg><use href="#i-receipt"/></svg><span>Maintenance</span><em class="badge-warn">7</em></button>
         <button class="nav-item" data-module="SPK"><svg><use href="#i-briefcase"/></svg><span>SPK / Work Order</span><em>4</em></button>
         <button class="nav-item" data-module="Pricing"><svg><use href="#i-tag"/></svg><span>Pricing</span></button>
@@ -51,7 +52,7 @@
         <button class="nav-item"><span class="nav-symbol">↗</span><span>Laporan</span></button>
         <button class="nav-item"><span class="nav-symbol">⚙</span><span>Pengaturan</span></button>
       </nav>
-      <div class="sidebar-bottom"><div class="help-card"><span class="help-icon">?</span><div><b>Butuh bantuan?</b><small>Hubungi support kami</small></div><svg><use href="#i-arrow"/></svg></div><div class="profile" id="profileMenu" role="button" tabindex="0" title="Akun saya"><div class="avatar avatar-purple" id="profileAvatar">AR</div><div><b id="profileName">Aditya Rahman</b><small id="profileRole">Administrator</small></div><span class="chevron">⌄</span></div><div class="profile-popover" id="profilePopover"><small id="profileEmail"></small><button class="secondary-button" id="logoutButton" type="button">Keluar</button></div><div class="app-version" id="appVersion">build v44</div></div>
+      <div class="sidebar-bottom"><div class="help-card"><span class="help-icon">?</span><div><b>Butuh bantuan?</b><small>Hubungi support kami</small></div><svg><use href="#i-arrow"/></svg></div><div class="profile" id="profileMenu" role="button" tabindex="0" title="Akun saya"><div class="avatar avatar-purple" id="profileAvatar">AR</div><div><b id="profileName">Aditya Rahman</b><small id="profileRole">Administrator</small></div><span class="chevron">⌄</span></div><div class="profile-popover" id="profilePopover"><small id="profileEmail"></small><button class="secondary-button" id="logoutButton" type="button">Keluar</button></div><div class="app-version" id="appVersion">build v45</div></div>
     </aside>
 
     <main class="main-content">
@@ -102,6 +103,10 @@
         <section class="module-intro"><div><p class="eyebrow">MASTER DATA · PEMASOK</p><h1>Pemasok</h1><p class="subheading">Direktori vendor beserta PIC yang terhubung ke contact.</p></div><div class="inventory-intro-actions"><button class="secondary-button" id="importVendorButton">Impor file</button><button class="primary-button" id="addVendorPageButton"><svg><use href="#i-plus"/></svg>Tambah pemasok</button></div></section>
         <section class="panel contacts-panel"><div class="panel-heading contacts-heading"><div><h3>Daftar pemasok</h3><p id="vendorDirectoryCount">Memuat data pemasok...</p></div><div class="customer-actions"><label class="asset-search"><svg><use href="#i-search"/></svg><input id="vendorDirectorySearch" type="search" placeholder="Cari nama, kontak..." /></label></div></div><div class="master-add"><input id="quickVendorName" placeholder="Nama pemasok baru" /><input id="quickVendorPhone" placeholder="Telepon (opsional)" /><button class="secondary-button" id="quickVendorAddButton" type="button">Simpan cepat</button></div><div class="table-scroll"><table><thead><tr><th>VENDOR</th><th>INFO KONTAK</th><th>PIC</th><th>STATUS</th><th></th></tr></thead><tbody id="vendorDirectoryRows"><tr><td colspan="5">Memuat data pemasok dari database...</td></tr></tbody></table></div></section>
       </div>
+      <div class="page-content module-view" id="relationView" hidden>
+        <section class="module-intro"><div><p class="eyebrow">MASTER DATA · RELASI</p><h1>Relasi Bisnis</h1><p class="subheading">Satu pihak sebagai customer saja, pemasok saja, atau keduanya.</p></div></section>
+        <section class="panel contacts-panel"><div class="panel-heading contacts-heading"><div><h3>Daftar relasi</h3><p id="relationDirectoryCount">Memuat data relasi...</p></div><div class="customer-actions"><label class="asset-search"><svg><use href="#i-search"/></svg><input id="relationDirectorySearch" type="search" placeholder="Cari nama..." /></label></div></div><div class="table-scroll"><table><thead><tr><th>PIHAK</th><th>PERAN</th><th>INFO KONTAK</th><th></th></tr></thead><tbody id="relationDirectoryRows"><tr><td colspan="4">Memuat data relasi dari database...</td></tr></tbody></table></div></section>
+      </div>
       <div class="page-content module-view" id="workOrderView" hidden>
         <section class="module-intro"><div><p class="eyebrow">OPERASIONAL · SERVICE ORDER</p><h1>SPK / Work Order</h1><p class="subheading">Kelola pekerjaan teknisi dari permintaan customer sampai selesai dan disetujui.</p></div><button class="primary-button" id="addWorkOrderButton"><svg><use href="#i-plus"/></svg>Buat SPK baru</button></section>
         <section class="workorder-metrics"><article class="workorder-metric"><span class="workorder-icon workorder-blue">SPK</span><div><small>Total SPK aktif</small><b>14</b><span>4 perlu ditindaklanjuti</span></div></article><article class="workorder-metric"><span class="workorder-icon workorder-orange">◷</span><div><small>Terjadwal hari ini</small><b>3</b><span class="warning-text">Menunggu teknisi</span></div></article><article class="workorder-metric"><span class="workorder-icon workorder-purple">↗</span><div><small>Dalam pengerjaan</small><b>6</b><span>Teknisi aktif</span></div></article><article class="workorder-metric"><span class="workorder-icon workorder-green">✓</span><div><small>Selesai bulan ini</small><b>22</b><span>95% tepat waktu</span></div></article></section>
@@ -137,7 +142,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="supabase-config.js"></script>
-  <script src="supabase-client-44.js"></script>
-  <script src="app-44.js"></script>
+    <script src="supabase-client-45.js"></script>
+    <script src="app-45.js"></script>
 </body>
 </html>
